@@ -53,7 +53,6 @@ uint8_t tx_buf[TX_BUF_SIZE];
 int latchPin = 8;
 int dataPin = 9;
 int clockPin = 7;
-byte switchVar1 = 0;
 
 void setup() {
 #if DEBUG
@@ -118,6 +117,7 @@ void setup() {
 }
 
 void loop() {
+  //checkInputs();
   // Check interval overflow
   #if DEBUG
   Serial.print("In Loop: ");
@@ -145,6 +145,27 @@ void loop() {
   
   // Check Lora RX
   lora.update();
+}
+
+byte checkInputs(){
+  byte switchVar1 = 0;
+  int tempEndTime = millis() + 5000;
+  while(millis() <= tempEndTime){
+    digitalWrite(latchPin,1);
+    digitalWrite(clockPin, HIGH);
+    delayMicroseconds(20);
+    digitalWrite(latchPin,0);
+    switchVar1 = shiftIn(dataPin, clockPin);
+    #if DEBUG
+      if( bitRead(switchVar1, 7) == 1){
+        Serial.println(switchVar1, BIN);
+        Serial.println(String("vrata"));
+      }else{
+        Serial.println(switchVar1, BIN);
+      }
+    #endif
+  }
+  return switchVar1;
 }
 
 byte shiftIn(int myDataPin, int myClockPin) {

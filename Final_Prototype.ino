@@ -27,17 +27,11 @@ const char *devEui = "70B3D57ED0047473";
 const char *appEui = "0022000000002200";
 const char *appKey = "F44FD48BBF11BC50D2FFB3BD34924263";
 
-const unsigned long interval = 20000;    // 10 s interval to send message
-const unsigned long intervalInputs = 60000;
-const unsigned long intervalSleep = 20000;
-unsigned long previousMillis = 20000;
-unsigned long previousMillisSleep = 20000;
-unsigned long previousMillisInputs = 60000;// will store last time message sent
-unsigned long previousMillisStatus = 0;
+unsigned long previousMillisWhileInputs = 0;
 unsigned int counter = 0;     // message counter
 
 const int TX_BUF_SIZE = 8;
-const uint8_t WAKEUP_CYCLES = 2;
+const uint8_t WAKEUP_CYCLES = 10;
 
 char myStr[50];
 char outStr[255];
@@ -67,14 +61,14 @@ void setup() {
   while(!Serial);
 #endif*/
   //Watchdog
-  /*ADCSRA = 0;
+  ADCSRA = 0;
 
   PRR = (1 << PRTWI) |
         (1 << PRTIM2) |
         (1 << PRTIM1) |
         //(1 << PRSPI) |
         //(1 << PRUSART0) |
-        (1 << PRADC);*/
+        (1 << PRADC);
   //Watchdog End
   
   //More Inputs
@@ -92,6 +86,61 @@ void setup() {
 #endif
   //DHT11 End
   
+  //Lora Init
+  initLoraWithJoin();
+  // Join procedure End
+}
+
+void loop() {
+  wakeup_count+=2;
+  if(wakeup_count > WAKEUP_CYCLES){    
+    while ( wakeup_count > 0 ) {
+      wakeup_count-=2;  
+      if(wakeup_count == 8 ) {   
+        Serial.print("Collecting Inputs");
+        switchVar = checkInputs();
+      }
+      if(awake){
+          // Check interval overflow
+        if(wakeup_count == 6) {
+          
+          sprintf(myStr, "Inputs-%d", switchVar ); 
+          
+          #if DEBUG
+          Serial.print("Sending: ");
+          Serial.println(myStr);
+          #endif
+          
+          lora.sendUplink(myStr, strlen(myStr), 0, 1);
+          counter++;
+    
+        }
+      
+        recvStatus = lora.readData(outStr);
+        if(recvStatus) {
+          Serial.println(outStr);
+        }
+            
+        // Check Lora RX
+        lora.update();
+      }else {
+        lora.wakeUp();
+        awake = true;
+        Serial.println("wake up...");
+        initLoraWithJoin();
+      }
+      Serial.println("awake: ");
+      Serial.println(awake); 
+    }
+  }else{
+    lora.sleep();      
+    awake = false;
+    Serial.println("Sleep Everyone");
+    goToSleep();
+  }
+}
+
+void initLoraWithJoin(){
   //Lora Init
   if(!lora.init()){
     #if DEBUG
@@ -123,96 +172,26 @@ void setup() {
   // Join procedure End
 }
 
-void loop() {
-  if(millis() - previousMillisInputs > intervalInputs) {   
-    //switchVar = checkInputs();
-    previousMillisInputs = millis();
-  }
-  if(awake){
-      // Check interval overflow
-    if(millis() - previousMillis > interval) {
-      previousMillis = millis(); 
-      
-      sprintf(myStr, "Inputs-%d", switchVar ); 
-      
-      #if DEBUG
-      Serial.print("Sending: ");
-      Serial.println(myStr);
-      #endif
-      
-      lora.sendUplink(myStr, strlen(myStr), 0, 1);
-      counter++;
-
-      
-      lora.sleep();      
-      awake = false;
-      previousMillisSleep = millis();
-      Serial.println("Sleep");
-    }
-  
-    
-    recvStatus = lora.readData(outStr);
-    if(recvStatus) {
-      Serial.println(outStr);
-    }
-    
-    // Check Lora RX
-    lora.update();
-  }else if(millis() - previousMillisSleep > intervalSleep){
-    lora.wakeUp();
-    awake = true;
-    Serial.println("wake up...");
-    initLoraWithJoin();
-  }
-  if(millis() - previousMillisStatus > intervalSleep / 5){
-    previousMillisStatus = millis();
-    Serial.println("awake: ");
-    Serial.println(awake); 
-  }
-  
-}
-
-void initLoraWithJoin(){
-  //Lora Init
-  /*if(!lora.init()){
-    #if DEBUG
-    Serial.println("RFM95 not detected");
-    #endif
-    delay(5000);
-    return;
-  }
-  lora.setDeviceClass(CLASS_A);
-  lora.setDataRate(SF9BW125);
-  lora.setChannel(MULTI);
-  lora.setDevEUI(devEui);
-  lora.setAppEUI(appEui);
-  lora.setAppKey(appKey);*/
-  //Lora Init End
-
-  // Join procedure
-  bool isJoined;
-  do {
-    #if DEBUG
-    Serial.println("Joining...");
-    #endif
-    isJoined = lora.join();
-    delay(5000);
-  }while(!isJoined);
-  #if DEBUG
-  Serial.println("Joined to network");
-  #endif
-  // Join procedure End
-}
-
 byte checkInputs(){
   byte switchVarTemp = 0;
-  int tempEndTime = millis() + 5000;
-  while(millis() <= tempEndTime){
+  int countTime = 0;
+  
+  while(countTime <= 5){
+    if(millis() - previousMillisWhileInputs > 1000 || shiftIn(dataPin, clockPin) == 255){
+      countTime++;
+      previousMillisWhileInputs = millis();
+    }
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
-    switchVarTemp = shiftIn(dataPin, clockPin);
+    byte tempSwitch = shiftIn(dataPin, clockPin);
+    if(tempSwitch > switchVarTemp){
+      #if DEBUG
+      Serial.println(switchVarTemp, BIN);
+      #endif
+      switchVarTemp = tempSwitch;
+    }
     /*#if DEBUG
       if( bitRead(switchVarTemp, 7) == 1){
         Serial.println(switchVarTemp, BIN);

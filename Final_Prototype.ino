@@ -81,7 +81,7 @@ void setup() {
   //More Inputs End
 
   //DHT11
-#if TEMPSENSOR
+#if TEMPSENSOR && DEBUG
   Serial.println("DHT11");
 #endif
   //DHT11 End

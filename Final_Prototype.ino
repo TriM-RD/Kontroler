@@ -55,6 +55,7 @@ uint8_t tx_buf[TX_BUF_SIZE];
 int latchPin = 8;
 int dataPin = 9;
 int clockPin = 7;
+byte switchVar = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -121,13 +122,13 @@ void setup() {
 void loop() {
   if(millis() - previousMillisInputs > intervalInputs) {
     previousMillisInputs = millis();
-    checkInputs();
+    switchVar = checkInputs();
   }
   // Check interval overflow
   if(millis() - previousMillis > interval) {
     previousMillis = millis(); 
 
-    sprintf(myStr, "%d", counter); 
+    sprintf(myStr, switchVar); 
     
     #if DEBUG
     Serial.print("Sending: ");
@@ -148,22 +149,22 @@ void loop() {
 }
 
 byte checkInputs(){
-  byte switchVar1 = 0;
+  byte switchVarTemp = 0;
   int tempEndTime = millis() + 5000;
   while(millis() <= tempEndTime){
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
-    switchVar1 = shiftIn(dataPin, clockPin);
+    switchVarTemp = shiftIn(dataPin, clockPin);
     #if DEBUG
-      if( bitRead(switchVar1, 7) == 1){
-        Serial.println(switchVar1, BIN);
+      if( bitRead(switchVarTemp, 7) == 1){
+        Serial.println(switchVarTemp, BIN);
         Serial.println(String("vrata"));
       }
     #endif
   }
-  return switchVar1;
+  return switchVarTemp;
 }
 
 byte shiftIn(int myDataPin, int myClockPin) {

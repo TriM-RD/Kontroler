@@ -128,7 +128,12 @@ void loop() {
   if(millis() - previousMillis > interval) {
     previousMillis = millis(); 
 
-    sprintf(myStr, switchVar); 
+    //sprintf(myStr, switchVar); 
+    //myStr[0] = lowByte(switchVar);
+    //myStr[1] = highByte(switchVar);
+    //char buffer[7];
+    //itoa(switchVar,buffer,10);
+    sprintf(myStr, "Inputs-%d", switchVar ); 
     
     #if DEBUG
     Serial.print("Sending: ");
@@ -157,12 +162,12 @@ byte checkInputs(){
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
     switchVarTemp = shiftIn(dataPin, clockPin);
-    #if DEBUG
+    /*#if DEBUG
       if( bitRead(switchVarTemp, 7) == 1){
         Serial.println(switchVarTemp, BIN);
         Serial.println(String("vrata"));
       }
-    #endif
+    #endif*/
   }
   return switchVarTemp;
 }

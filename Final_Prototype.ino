@@ -10,7 +10,7 @@
  * please buy us a round!
  * Distributed as-is; no warranty is given.
  */
-#define DEBUG 1
+#define DEBUG 1 // Treba biti 1 da bi radio program -_-
 #define TEMPSENSOR 0
 
 #include <lorawan.h>
@@ -28,7 +28,9 @@ const char *appEui = "0022000000002200";
 const char *appKey = "F44FD48BBF11BC50D2FFB3BD34924263";
 
 const unsigned long interval = 10000;    // 10 s interval to send message
-unsigned long previousMillis = 0;  // will store last time message sent
+const unsigned long intervalInputs = 60000;
+unsigned long previousMillis = 0;
+unsigned long previousMillisInputs = 0;// will store last time message sent
 unsigned int counter = 0;     // message counter
 
 const int TX_BUF_SIZE = 8;
@@ -56,9 +58,9 @@ int clockPin = 7;
 
 void setup() {
   Serial.begin(9600);
-#if DEBUG 
+/*#if DEBUG 
   while(!Serial);
-#endif
+#endif*/
   //Watchdog
   /*ADCSRA = 0;
 
@@ -117,7 +119,10 @@ void setup() {
 }
 
 void loop() {
-  //checkInputs();
+  if(millis() - previousMillisInputs > intervalInputs) {
+    previousMillisInputs = millis();
+    checkInputs();
+  }
   // Check interval overflow
   if(millis() - previousMillis > interval) {
     previousMillis = millis(); 
@@ -155,8 +160,6 @@ byte checkInputs(){
       if( bitRead(switchVar1, 7) == 1){
         Serial.println(switchVar1, BIN);
         Serial.println(String("vrata"));
-      }else{
-        Serial.println(switchVar1, BIN);
       }
     #endif
   }

@@ -27,10 +27,13 @@ const char *devEui = "70B3D57ED0047473";
 const char *appEui = "0022000000002200";
 const char *appKey = "F44FD48BBF11BC50D2FFB3BD34924263";
 
-const unsigned long interval = 10000;    // 10 s interval to send message
+const unsigned long interval = 20000;    // 10 s interval to send message
 const unsigned long intervalInputs = 60000;
-unsigned long previousMillis = 0;
-unsigned long previousMillisInputs = 0;// will store last time message sent
+const unsigned long intervalSleep = 20000;
+unsigned long previousMillis = 20000;
+unsigned long previousMillisSleep = 20000;
+unsigned long previousMillisInputs = 60000;// will store last time message sent
+unsigned long previousMillisStatus = 0;
 unsigned int counter = 0;     // message counter
 
 const int TX_BUF_SIZE = 8;
@@ -39,6 +42,7 @@ const uint8_t WAKEUP_CYCLES = 2;
 char myStr[50];
 char outStr[255];
 byte recvStatus = 0;
+bool awake = true;
 
 const sRFM_pins RFM_pins = {
   .CS = 6,
@@ -120,37 +124,84 @@ void setup() {
 }
 
 void loop() {
-  if(millis() - previousMillisInputs > intervalInputs) {
+  if(millis() - previousMillisInputs > intervalInputs) {   
+    //switchVar = checkInputs();
     previousMillisInputs = millis();
-    switchVar = checkInputs();
   }
-  // Check interval overflow
-  if(millis() - previousMillis > interval) {
-    previousMillis = millis(); 
+  if(awake){
+      // Check interval overflow
+    if(millis() - previousMillis > interval) {
+      previousMillis = millis(); 
+      
+      sprintf(myStr, "Inputs-%d", switchVar ); 
+      
+      #if DEBUG
+      Serial.print("Sending: ");
+      Serial.println(myStr);
+      #endif
+      
+      lora.sendUplink(myStr, strlen(myStr), 0, 1);
+      counter++;
 
-    //sprintf(myStr, switchVar); 
-    //myStr[0] = lowByte(switchVar);
-    //myStr[1] = highByte(switchVar);
-    //char buffer[7];
-    //itoa(switchVar,buffer,10);
-    sprintf(myStr, "Inputs-%d", switchVar ); 
+      
+      lora.sleep();      
+      awake = false;
+      previousMillisSleep = millis();
+      Serial.println("Sleep");
+    }
+  
     
-    #if DEBUG
-    Serial.print("Sending: ");
-    Serial.println(myStr);
-    #endif
+    recvStatus = lora.readData(outStr);
+    if(recvStatus) {
+      Serial.println(outStr);
+    }
     
-    lora.sendUplink(myStr, strlen(myStr), 0, 1);
-    counter++;
+    // Check Lora RX
+    lora.update();
+  }else if(millis() - previousMillisSleep > intervalSleep){
+    lora.wakeUp();
+    awake = true;
+    Serial.println("wake up...");
+    initLoraWithJoin();
   }
-
-  recvStatus = lora.readData(outStr);
-  if(recvStatus) {
-    Serial.println(outStr);
+  if(millis() - previousMillisStatus > intervalSleep / 5){
+    previousMillisStatus = millis();
+    Serial.println("awake: ");
+    Serial.println(awake); 
   }
   
-  // Check Lora RX
-  lora.update();
+}
+
+void initLoraWithJoin(){
+  //Lora Init
+  /*if(!lora.init()){
+    #if DEBUG
+    Serial.println("RFM95 not detected");
+    #endif
+    delay(5000);
+    return;
+  }
+  lora.setDeviceClass(CLASS_A);
+  lora.setDataRate(SF9BW125);
+  lora.setChannel(MULTI);
+  lora.setDevEUI(devEui);
+  lora.setAppEUI(appEui);
+  lora.setAppKey(appKey);*/
+  //Lora Init End
+
+  // Join procedure
+  bool isJoined;
+  do {
+    #if DEBUG
+    Serial.println("Joining...");
+    #endif
+    isJoined = lora.join();
+    delay(5000);
+  }while(!isJoined);
+  #if DEBUG
+  Serial.println("Joined to network");
+  #endif
+  // Join procedure End
 }
 
 byte checkInputs(){

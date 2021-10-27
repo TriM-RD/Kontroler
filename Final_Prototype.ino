@@ -53,14 +53,14 @@ void setup() {
   while(!Serial);
 #endif
   //Watchdog
-  ADCSRA = 0;
+  /*ADCSRA = 0;
 
   PRR = (1 << PRTWI) |
         (1 << PRTIM2) |
         (1 << PRTIM1) |
         //(1 << PRSPI) |
         //(1 << PRUSART0) |
-        (1 << PRADC);
+        (1 << PRADC);*/
   //Watchdog End
   
   //More Inputs
@@ -95,7 +95,7 @@ void setup() {
     Serial.println("Joining...");
     #endif
     isJoined = lora.join();
-    delay(10000);
+    delay(5000);
   }while(!isJoined);
   #if DEBUG
   Serial.println("Joined to network");

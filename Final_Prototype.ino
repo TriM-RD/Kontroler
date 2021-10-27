@@ -55,8 +55,8 @@ int dataPin = 9;
 int clockPin = 7;
 
 void setup() {
-#if DEBUG
   Serial.begin(9600);
+#if DEBUG 
   while(!Serial);
 #endif
   //Watchdog
@@ -119,9 +119,6 @@ void setup() {
 void loop() {
   //checkInputs();
   // Check interval overflow
-  #if DEBUG
-  Serial.print("In Loop: ");
-  #endif
   if(millis() - previousMillis > interval) {
     previousMillis = millis(); 
 
@@ -138,9 +135,7 @@ void loop() {
 
   recvStatus = lora.readData(outStr);
   if(recvStatus) {
-    #if DEBUG
     Serial.println(outStr);
-    #endif
   }
   
   // Check Lora RX

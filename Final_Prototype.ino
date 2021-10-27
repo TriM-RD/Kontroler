@@ -10,9 +10,17 @@
  * please buy us a round!
  * Distributed as-is; no warranty is given.
  */
-#include <lorawan.h>
-
 #define DEBUG 1
+#define TEMPSENSOR 0
+
+#include <lorawan.h>
+#if TEMPSENSOR
+  #include "DHTStable.h"
+  DHTStable DHT;
+  #define DHT11_PIN A0
+#endif
+
+
 
 // OTAA credentials
 const char *devEui = "70B3D57ED0047473";
@@ -71,6 +79,12 @@ void setup() {
   Serial.println(String("More Inputs"));
 #endif
   //More Inputs End
+
+  //DHT11
+#if TEMPSENSOR
+  Serial.println("DHT11");
+#endif
+  //DHT11 End
   
   //Lora Init
   if(!lora.init()){

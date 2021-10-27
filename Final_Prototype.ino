@@ -53,20 +53,23 @@ void setup() {
   while(!Serial);
 #endif
   //Watchdog
-  /*ADCSRA = 0;
+  ADCSRA = 0;
 
   PRR = (1 << PRTWI) |
         (1 << PRTIM2) |
         (1 << PRTIM1) |
         //(1 << PRSPI) |
         //(1 << PRUSART0) |
-        (1 << PRADC);*/
+        (1 << PRADC);
   //Watchdog End
   
   //More Inputs
   pinMode(latchPin, OUTPUT);
   pinMode(clockPin, OUTPUT);
   pinMode(dataPin, INPUT);
+#if DEBUG
+  Serial.println(String("More Inputs"));
+#endif
   //More Inputs End
   
   //Lora Init

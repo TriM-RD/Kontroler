@@ -31,7 +31,7 @@ unsigned long previousMillisWhileInputs = 0;
 unsigned int counter = 0;     // message counter
 
 const int TX_BUF_SIZE = 8;
-const uint8_t WAKEUP_CYCLES = 10;
+const uint8_t WAKEUP_CYCLES = 100;
 
 char myStr[50];
 char outStr[255];
@@ -131,12 +131,13 @@ void loop() {
       }
       Serial.println("awake: ");
       Serial.println(awake); 
+      if(wakeup_count == 2){
+        lora.sleep();      
+        awake = false;
+        Serial.println("Sleep Everyone");
+        goToSleep();
+      }
     }
-  }else{
-    lora.sleep();      
-    awake = false;
-    Serial.println("Sleep Everyone");
-    goToSleep();
   }
 }
 

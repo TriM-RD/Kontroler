@@ -31,7 +31,7 @@ unsigned long previousMillisWhileInputs = 0;
 unsigned int counter = 0;     // message counter
 
 const int TX_BUF_SIZE = 8;
-const uint8_t WAKEUP_CYCLES = 100;
+const uint8_t WAKEUP_CYCLES = 20; // Minimum is 10
 
 char myStr[50];
 char outStr[255];
@@ -87,6 +87,7 @@ void setup() {
   //DHT11 End
   
   //Lora Init
+  awake = true;
   initLoraWithJoin();
   // Join procedure End
 }
@@ -94,51 +95,56 @@ void setup() {
 void loop() {
   wakeup_count+=2;
   if(wakeup_count > WAKEUP_CYCLES){    
-    while ( wakeup_count > 0 ) {
-      wakeup_count-=2;  
-      if(wakeup_count == 8 ) {   
-        Serial.print("Collecting Inputs");
-        switchVar = checkInputs();
-      }
-      if(awake){
-          // Check interval overflow
-        if(wakeup_count == 6) {
-          
-          sprintf(myStr, "Inputs-%d", switchVar ); 
-          
+    programLoop();
+    wakeup_count = 0; // Just to be safe
+  }else{
+    goToSleep();
+  }
+}
+
+void programLoop(){
+  while ( wakeup_count > 0 ) {
+      wakeup_count-=2;
+      switch(wakeup_count){
+        case 2:
+          lora.sleep();      
+          awake = false;
+          Serial.println("Sleep Everyone");
+          goToSleep();
+          return;
+        case 6:
+          sprintf(myStr, "Inputs-%d", switchVar );       
           #if DEBUG
           Serial.print("Sending: ");
           Serial.println(myStr);
-          #endif
-          
+          #endif         
           lora.sendUplink(myStr, strlen(myStr), 0, 1);
           counter++;
-    
-        }
-      
-        recvStatus = lora.readData(outStr);
-        if(recvStatus) {
-          Serial.println(outStr);
-        }
-            
-        // Check Lora RX
-        lora.update();
-      }else {
-        lora.wakeUp();
-        awake = true;
-        Serial.println("wake up...");
-        initLoraWithJoin();
-      }
-      Serial.println("awake: ");
-      Serial.println(awake); 
-      if(wakeup_count == 2){
-        lora.sleep();      
-        awake = false;
-        Serial.println("Sleep Everyone");
-        goToSleep();
-      }
+        break;
+        case 10:
+          if(!awake){
+            lora.wakeUp();
+            awake = true;
+            Serial.println("wake up...");
+            initLoraWithJoin();
+          }
+        break;
+        case 12:
+          Serial.print("Collecting Inputs");
+          switchVar = checkInputs();
+        break;
+        default:
+          if(awake){
+            recvStatus = lora.readData(outStr);
+            if(recvStatus) {
+              Serial.println(outStr);
+            }  
+            // Check Lora RX
+            lora.update();
+          }
+        break;
+      }             
     }
-  }
 }
 
 void initLoraWithJoin(){
@@ -240,7 +246,7 @@ void goToSleep() {
 
   asm("cli");
   
-  uint8_t wdt_timeout = (1 << WDP3);
+  uint8_t wdt_timeout = (1 << WDP3) | (1 << WDP0);
   asm("wdr");
   WDTCSR |= (1 << WDCE) | (1 << WDE);
   WDTCSR = (1 << WDIE) | wdt_timeout;

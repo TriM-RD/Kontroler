@@ -23,11 +23,12 @@
 
 
 // OTAA credentials
-const char *devEui = "70B3D57ED0047473";
-const char *appEui = "0022000000002200";
-const char *appKey = "F44FD48BBF11BC50D2FFB3BD34924263";
+const char *devEui = "70B3D57ED00479CC";
+const char *appEui = "0000000000000000";
+const char *appKey = "DBCFEED9F256714881FCD74689A6D8CD";
 
 unsigned long previousMillisWhileInputs = 0;
+unsigned long previousMillis = 0;
 unsigned int counter = 0;     // message counter
 
 const int TX_BUF_SIZE = 8;
@@ -93,16 +94,67 @@ void setup() {
 }
 
 void loop() {
-  wakeup_count+=2;
-  if(wakeup_count > WAKEUP_CYCLES){    
-    programLoop();
-    wakeup_count = 0; // Just to be safe
-  }else{
-    goToSleep();
-  }
+  wakeup_count= 6;
+  switch(wakeup_count){
+        case 2:
+          //lora.sleep();      
+          awake = false;
+          Serial.println("Sleep Everyone");
+          goToSleep();
+          return;
+        case 6:
+          int countTime = 0;
+          
+          while(countTime <= 5){
+            if(millis() - previousMillis > 10000) {
+              //lora.wakeUp();
+              previousMillis = millis(); 
+          
+              sprintf(myStr, "%d", counter); 
+          
+              Serial.print("Sending: ");
+              Serial.println(myStr);
+              
+              lora.sendUplink(myStr, strlen(myStr), 0, 1);
+              counter++;
+              countTime++;
+            }
+          
+            recvStatus = lora.readData(outStr);
+            if(recvStatus) {
+              Serial.println(outStr);
+            }
+            
+            // Check Lora RX
+            lora.update();
+          } 
+        break;
+        case 10:
+          if(!awake){
+            //lora.wakeUp();
+            awake = true;
+            Serial.println("wake up...");
+            //initLoraWithJoin();
+          }
+        break;
+        case 12:
+          Serial.print("Collecting Inputs");
+          switchVar = checkInputs();
+        break;
+        /*default:
+          if(awake){
+            recvStatus = lora.readData(outStr);
+            if(recvStatus) {
+              Serial.println(outStr);
+            }  
+            // Check Lora RX
+            lora.update();
+          }
+        break;*/
+      }
 }
 
-void programLoop(){
+/*void programLoop(){
   while ( wakeup_count > 0 ) {
       wakeup_count-=2;
       switch(wakeup_count){
@@ -145,7 +197,7 @@ void programLoop(){
         break;
       }             
     }
-}
+}*/
 
 void initLoraWithJoin(){
   //Lora Init

@@ -11,30 +11,19 @@
  * Distributed as-is; no warranty is given.
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
-#define TEMPSENSOR 0
 
 #include <lorawan.h>
-#if TEMPSENSOR
-  #include "DHTStable.h"
-  DHTStable DHT;
-  #define DHT11_PIN A0
-#endif
-
-
 
 // OTAA credentials
-const char *devEui = "70B3D57ED00479CC";
+const char *devEui = "70B3D57ED0047A68";
 const char *appEui = "0000000000000000";
-const char *appKey = "DBCFEED9F256714881FCD74689A6D8CD";
+const char *appKey = "7288B2FE17CD5AB5F37B2E23C503FA0C";
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
-unsigned int counter = 0;     // message counter
+uint8_t count = 0;
 
-const int TX_BUF_SIZE = 8;
-const uint8_t WAKEUP_CYCLES = 20; // Minimum is 10
-
-char myStr[50];
+char myStr[5];
 char outStr[255];
 byte recvStatus = 0;
 
@@ -47,8 +36,8 @@ const sRFM_pins RFM_pins = {
   .DIO5 = -1,
 };
 
-uint8_t wakeup_count = WAKEUP_CYCLES;
-uint8_t tx_buf[TX_BUF_SIZE];
+uint8_t wakeup_count = 3; //Change on two places
+uint8_t tx_buf[8]; // TX_BUF_SIZE
 
 int latchPin = 8;
 int dataPin = 9;
@@ -92,38 +81,38 @@ void setup() {
 }
 
 void loop() {
-  /*while(wakeup_count < WAKEUP_CYCLES){
-    
-  }*/
   delay(1000);
-  switchVar = checkInputs();
-  uint8_t count = 0;
-  while(count <= 5){
-    lora.wakeUp();
-    if(millis() - previousMillis > 10000) {
-      //lora.wakeUp();
-      previousMillis = millis(); 
-  
-      sprintf(myStr, "%d", counter); 
-  
-      Serial.print("Sending: ");
-      Serial.println(myStr);
-      
-      lora.sendUplink(myStr, strlen(myStr), 0, 1);
-      counter++;
-      count++;
-    }
-  
-    recvStatus = lora.readData(outStr);
-    if(recvStatus) {
-      Serial.println(recvStatus);
-    }
+  if(wakeup_count >= 3){
+    switchVar = checkInputs();
+    while(count <= 1){
+      lora.wakeUp();
+      if(millis() - previousMillis > 10000) {
+        //lora.wakeUp();
+        previousMillis = millis(); 
     
-    // Check Lora RX
-    lora.update();
-  } 
-  //Serial.println("Sleep Everyone");
-  lora.sleep();
+        sprintf(myStr, "%d", 255); 
+    
+        Serial.print("Sending: ");
+        Serial.println(myStr);
+        
+        lora.sendUplink(myStr, strlen(myStr), 0, 1);
+        count++;
+      }
+    
+      recvStatus = lora.readData(outStr);
+      if(recvStatus) {
+        Serial.println(outStr);
+      }
+      
+      // Check Lora RX
+      lora.update();
+    } 
+    lora.sleep();
+    wakeup_count = 0;
+    count = 0;
+  }
+  wakeup_count++;
+  delay(1000);
   goToSleep();
 }
 

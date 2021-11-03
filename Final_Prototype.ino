@@ -37,7 +37,6 @@ const uint8_t WAKEUP_CYCLES = 20; // Minimum is 10
 char myStr[50];
 char outStr[255];
 byte recvStatus = 0;
-bool awake = true;
 
 const sRFM_pins RFM_pins = {
   .CS = 6,
@@ -88,70 +87,44 @@ void setup() {
   //DHT11 End
   
   //Lora Init
-  awake = true;
   initLoraWithJoin();
   // Join procedure End
 }
 
 void loop() {
-  wakeup_count= 6;
-  switch(wakeup_count){
-        case 2:
-          //lora.sleep();      
-          awake = false;
-          Serial.println("Sleep Everyone");
-          goToSleep();
-          return;
-        case 6:
-          int countTime = 0;
-          
-          while(countTime <= 5){
-            if(millis() - previousMillis > 10000) {
-              //lora.wakeUp();
-              previousMillis = millis(); 
-          
-              sprintf(myStr, "%d", counter); 
-          
-              Serial.print("Sending: ");
-              Serial.println(myStr);
-              
-              lora.sendUplink(myStr, strlen(myStr), 0, 1);
-              counter++;
-              countTime++;
-            }
-          
-            recvStatus = lora.readData(outStr);
-            if(recvStatus) {
-              Serial.println(outStr);
-            }
-            
-            // Check Lora RX
-            lora.update();
-          } 
-        break;
-        case 10:
-          if(!awake){
-            //lora.wakeUp();
-            awake = true;
-            Serial.println("wake up...");
-            //initLoraWithJoin();
-          }
-        break;
-        case 12:
-          Serial.print("Collecting Inputs");
-          switchVar = checkInputs();
-        break;
-        /*default:
-          if(awake){
-            recvStatus = lora.readData(outStr);
-            if(recvStatus) {
-              Serial.println(outStr);
-            }  
-            // Check Lora RX
-            lora.update();
-          }
-        break;*/
-      }
+  /*while(wakeup_count < WAKEUP_CYCLES){
+    
+  }*/
+  delay(5000);
+  switchVar = checkInputs();
+  uint8_t count = 0;
+  while(count <= 5){
+    lora.wakeUp();
+    if(millis() - previousMillis > 10000) {
+      //lora.wakeUp();
+      previousMillis = millis(); 
+  
+      sprintf(myStr, "%d", counter); 
+  
+      Serial.print("Sending: ");
+      Serial.println(myStr);
+      
+      lora.sendUplink(myStr, strlen(myStr), 0, 1);
+      counter++;
+      count++;
+    }
+  
+    recvStatus = lora.readData(outStr);
+    if(recvStatus) {
+      Serial.println(outStr);
+    }
+    
+    // Check Lora RX
+    lora.update();
+  } 
+  //Serial.println("Sleep Everyone");
+  lora.sleep();
+  goToSleep();
 }
 
 /*void programLoop(){

@@ -95,7 +95,7 @@ void loop() {
   /*while(wakeup_count < WAKEUP_CYCLES){
     
   }*/
-  delay(5000);
+  delay(1000);
   switchVar = checkInputs();
   uint8_t count = 0;
   while(count <= 5){
@@ -116,7 +116,7 @@ void loop() {
   
     recvStatus = lora.readData(outStr);
     if(recvStatus) {
-      Serial.println(outStr);
+      Serial.println(recvStatus);
     }
     
     // Check Lora RX
@@ -126,51 +126,6 @@ void loop() {
   lora.sleep();
   goToSleep();
 }
-
-/*void programLoop(){
-  while ( wakeup_count > 0 ) {
-      wakeup_count-=2;
-      switch(wakeup_count){
-        case 2:
-          lora.sleep();      
-          awake = false;
-          Serial.println("Sleep Everyone");
-          goToSleep();
-          return;
-        case 6:
-          sprintf(myStr, "Inputs-%d", switchVar );       
-          #if DEBUG
-          Serial.print("Sending: ");
-          Serial.println(myStr);
-          #endif         
-          lora.sendUplink(myStr, strlen(myStr), 0, 1);
-          counter++;
-        break;
-        case 10:
-          if(!awake){
-            lora.wakeUp();
-            awake = true;
-            Serial.println("wake up...");
-            initLoraWithJoin();
-          }
-        break;
-        case 12:
-          Serial.print("Collecting Inputs");
-          switchVar = checkInputs();
-        break;
-        default:
-          if(awake){
-            recvStatus = lora.readData(outStr);
-            if(recvStatus) {
-              Serial.println(outStr);
-            }  
-            // Check Lora RX
-            lora.update();
-          }
-        break;
-      }             
-    }
-}*/
 
 void initLoraWithJoin(){
   //Lora Init

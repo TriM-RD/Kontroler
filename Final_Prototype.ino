@@ -36,7 +36,7 @@ const sRFM_pins RFM_pins = {
   .DIO5 = -1,
 };
 
-uint8_t wakeup_count = 3; //Change on two places
+uint8_t wakeup_count = 10; //Change on two places
 uint8_t tx_buf[8]; // TX_BUF_SIZE
 
 int latchPin = 8;
@@ -82,7 +82,8 @@ void setup() {
 
 void loop() {
   delay(1000);
-  if(wakeup_count >= 3){
+  if(wakeup_count >= 10)//Change on two places
+  {
     switchVar = checkInputs();
     while(count <= 1){
       lora.wakeUp();
@@ -90,7 +91,7 @@ void loop() {
         //lora.wakeUp();
         previousMillis = millis(); 
     
-        sprintf(myStr, "%d", 255); 
+        sprintf(myStr, "%d", switchVar); 
     
         Serial.print("Sending: ");
         Serial.println(myStr);

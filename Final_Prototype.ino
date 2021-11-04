@@ -10,59 +10,24 @@
  * please buy us a round!
  * Distributed as-is; no warranty is given.
  */
-#define DEBUG 1 // Treba biti 1 da bi radio program -_-
-
-#include <lorawan.h>
-
-// OTAA credentials
-const char *devEui = "70B3D57ED0047A68";
-const char *appEui = "0000000000000000";
-const char *appKey = "7288B2FE17CD5AB5F37B2E23C503FA0C";
+#define DEBUG 0 // Treba biti 1 da bi radio program -_-
 
 unsigned long previousMillisWhileInputs = 0;
-unsigned long previousMillis = 0;
-uint8_t count = 0;
-
-char myStr[5];
-char outStr[255];
-byte recvStatus = 0;
-
-const sRFM_pins RFM_pins = {
-  .CS = 6,
-  .RST = 5,
-  .DIO0 = 2,
-  .DIO1 = 3,
-  .DIO2 = 4,
-  .DIO5 = -1,
-};
-
-uint8_t wakeup_count = 10; //Change on two places
-uint8_t tx_buf[8]; // TX_BUF_SIZE
-
 int latchPin = 8;
 int dataPin = 9;
 int clockPin = 7;
+int led = 10;
 byte switchVar = 0;
 
 void setup() {
-  Serial.begin(9600);
-/*#if DEBUG 
-  while(!Serial);
-#endif*/
-  //Watchdog
-  ADCSRA = 0;
+Serial.begin(9600); 
+while(!Serial);
 
-  PRR = (1 << PRTWI) |
-        (1 << PRTIM2) |
-        (1 << PRTIM1) |
-        //(1 << PRSPI) |
-        //(1 << PRUSART0) |
-        (1 << PRADC);
-  //Watchdog End
   
   //More Inputs
   pinMode(latchPin, OUTPUT);
   pinMode(clockPin, OUTPUT);
+  pinMode(led, OUTPUT);
   pinMode(dataPin, INPUT);
 #if DEBUG
   Serial.println(String("More Inputs"));
@@ -74,79 +39,15 @@ void setup() {
   Serial.println("DHT11");
 #endif
   //DHT11 End
-  
-  //Lora Init
-  initLoraWithJoin();
-  // Join procedure End
 }
 
 void loop() {
   delay(1000);
-  if(wakeup_count >= 10)//Change on two places
-  {
-    switchVar = checkInputs();
-    while(count <= 1){
-      lora.wakeUp();
-      if(millis() - previousMillis > 10000) {
-        //lora.wakeUp();
-        previousMillis = millis(); 
-    
-        sprintf(myStr, "%d", switchVar); 
-    
-        Serial.print("Sending: ");
-        Serial.println(myStr);
-        
-        lora.sendUplink(myStr, strlen(myStr), 0, 1);
-        count++;
-      }
-    
-      recvStatus = lora.readData(outStr);
-      if(recvStatus) {
-        Serial.println(outStr);
-      }
-      
-      // Check Lora RX
-      lora.update();
-    } 
-    lora.sleep();
-    wakeup_count = 0;
-    count = 0;
-  }
-  wakeup_count++;
-  delay(1000);
-  goToSleep();
-}
-
-void initLoraWithJoin(){
-  //Lora Init
-  if(!lora.init()){
-    #if DEBUG
-    Serial.println("RFM95 not detected");
-    #endif
-    delay(5000);
-    return;
-  }
-  lora.setDeviceClass(CLASS_A);
-  lora.setDataRate(SF9BW125);
-  lora.setChannel(MULTI);
-  lora.setDevEUI(devEui);
-  lora.setAppEUI(appEui);
-  lora.setAppKey(appKey);
-  //Lora Init End
-
-  // Join procedure
-  bool isJoined;
-  do {
-    #if DEBUG
-    Serial.println("Joining...");
-    #endif
-    isJoined = lora.join();
-    delay(5000);
-  }while(!isJoined);
-  #if DEBUG
-  Serial.println("Joined to network");
-  #endif
-  // Join procedure End
+  digitalWrite(led, HIGH);
+  switchVar = checkInputs();
+  Serial.println(switchVar);
+  delay(5000);
+  digitalWrite(led, LOW);
 }
 
 byte checkInputs(){
@@ -169,12 +70,6 @@ byte checkInputs(){
       #endif
       switchVarTemp = tempSwitch;
     }
-    /*#if DEBUG
-      if( bitRead(switchVarTemp, 7) == 1){
-        Serial.println(switchVarTemp, BIN);
-        Serial.println(String("vrata"));
-      }
-    #endif*/
   }
   return switchVarTemp;
 }
@@ -204,34 +99,4 @@ byte shiftIn(int myDataPin, int myClockPin) {
     digitalWrite(myClockPin, 1);
   }
   return myDataIn;
-}
-
-ISR(WDT_vect){
-  asm("wdr");
-  WDTCSR |= (1 << WDCE) | (1 << WDE);
-  WDTCSR = 0x00;
-}
-
-void goToSleep() {
-
-  asm("cli");
-  
-  uint8_t wdt_timeout = (1 << WDP3) | (1 << WDP0);
-  asm("wdr");
-  WDTCSR |= (1 << WDCE) | (1 << WDE);
-  WDTCSR = (1 << WDIE) | wdt_timeout;
-
-  SMCR |= (1 << SM1);
-  SMCR |= (1 << SE);
-
-  uint8_t mcucr_backup = MCUCR;
-  MCUCR = (1 << BODS) | (1 << BODSE);
-  MCUCR = (1 << BODS);
-
-  asm("sei");
-  asm("sleep");
-
-  SMCR &= ~(1 << SE);
-
-  MCUCR = mcucr_backup;
 }

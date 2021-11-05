@@ -15,9 +15,9 @@
 #include <lorawan.h>
 
 // OTAA credentials
-const char *devEui = "70B3D57ED0047A68";
-const char *appEui = "0000000000000000";
-const char *appKey = "7288B2FE17CD5AB5F37B2E23C503FA0C";
+const char devEui[] PROGMEM = {"70B3D57ED0047C31"};
+const char appEui[] PROGMEM = {"0000000000000000"};
+const char appKey[] PROGMEM = {"4AEFEF94C7B2291A41E0B634E9CEB977"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
@@ -129,9 +129,21 @@ void initLoraWithJoin(){
   lora.setDeviceClass(CLASS_A);
   lora.setDataRate(SF9BW125);
   lora.setChannel(MULTI);
-  lora.setDevEUI(devEui);
-  lora.setAppEUI(appEui);
-  lora.setAppKey(appKey);
+  char output1[16];
+  for (byte k = 0; k < 16; k++) {
+    output1[k] = pgm_read_byte_near(devEui + k);
+  }
+  lora.setDevEUI(output1);
+  char output2[16];
+  for (byte k = 0; k < 16; k++) {
+    output2[k] = pgm_read_byte_near(appEui + k);
+  }
+  lora.setAppEUI(output2);
+  char output3[32];
+  for (byte k = 0; k < 32; k++) {
+    output3[k] = pgm_read_byte_near(appKey + k);
+  }
+  lora.setAppKey(output3);
   //Lora Init End
 
   // Join procedure

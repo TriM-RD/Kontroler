@@ -11,20 +11,21 @@
  * Distributed as-is; no warranty is given.
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
-
 #include <lorawan.h>
+#include "DHT.h"
 
+DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047EAB"};
+const char devEui[] PROGMEM = {"70B3D57ED0047EBE"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"6A19DD23F66C28E18E4EB959DFFCB698"};
+const char appKey[] PROGMEM = {"624246474679964BED52FD7A935C5A75"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
 uint8_t count = 0;
 
-char myStr[20]; // + 5
+char myStr[10]; // + 5
 char outStr[255];
 byte recvStatus = 0;
 
@@ -43,7 +44,8 @@ uint8_t wakeup_count = 3; //Change on two places
 const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
-byte payload[2] = {0,0};
+
+byte payload[4] = {0, 0, 0, 0};
 
 void setup() {
   Serial.begin(9600);
@@ -74,6 +76,7 @@ void setup() {
 #if TEMPSENSOR && DEBUG
   Serial.println("DHT11");
 #endif
+dht.setup(A0);
   //DHT11 End
   
   //Lora Init
@@ -86,6 +89,7 @@ void loop() {
   if(wakeup_count >= 3)//Change on two places
   {
     checkInputs();
+    getDht11Inputs();
     //switchVar = checkInputs();
     while(count <= 1){
       lora.wakeUp();
@@ -99,7 +103,7 @@ void loop() {
         Serial.println(myStr);
         
         //lora.sendUplink(myStr, strlen(myStr), 0, 1);
-        lora.sendUplink(payload, 2, 0, 1);
+        lora.sendUplink(payload, 4, 0, 1);
         count++;
       }
     
@@ -163,6 +167,14 @@ void initLoraWithJoin(){
   Serial.println("Joined to network");
   #endif
   // Join procedure End
+}
+
+void getDht11Inputs(){
+  while(dht.getStatusString() != "OK"){
+    delay(dht.getMinimumSamplingPeriod());
+    payload[3] = dht.getHumidity();
+    payload[4] = dht.getTemperature();
+  }
 }
 
 void checkInputs(){

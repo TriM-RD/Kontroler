@@ -170,11 +170,12 @@ void initLoraWithJoin(){
 }
 
 void getDht11Inputs(){
-  while(dht.getStatusString() != "OK"){
+  do{
     delay(dht.getMinimumSamplingPeriod());
-    payload[3] = dht.getHumidity();
-    payload[4] = dht.getTemperature();
-  }
+    payload[2] = dht.getHumidity();
+    payload[3] = dht.getTemperature();
+  }while(dht.getStatusString() != "OK");
+  
 }
 
 void checkInputs(){

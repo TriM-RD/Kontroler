@@ -15,9 +15,9 @@
 #include <lorawan.h>
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047E8F"};
+const char devEui[] PROGMEM = {"70B3D57ED0047EA2"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"E0219C6AC3C36D93F0F9CB0C3790086E"};
+const char appKey[] PROGMEM = {"D87789608A49D137A6AFC3C9DBF68FA7"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
@@ -42,7 +42,7 @@ uint8_t tx_buf[32]; // TX_BUF_SIZE +8
 const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
-byte * switchVar = 0;
+byte payload[2] = {0,0};
 
 void setup() {
   Serial.begin(9600);
@@ -84,6 +84,7 @@ void loop() {
   delay(1000);
   if(wakeup_count >= 3)//Change on two places
   {
+    checkInputs();
     //switchVar = checkInputs();
     while(count <= 1){
       lora.wakeUp();
@@ -91,12 +92,13 @@ void loop() {
         
         previousMillis = millis(); 
     
-        sprintf(myStr, "%u", switchVar); 
+        //sprintf(myStr, "%u", switchVar); 
     
         Serial.print("Sending: ");
         Serial.println(myStr);
         
-        lora.sendUplink(myStr, strlen(myStr), 0, 1);
+        //lora.sendUplink(myStr, strlen(myStr), 0, 1);
+        lora.sendUplink(payload, 2, 0, 1);
         count++;
       }
     
@@ -108,7 +110,7 @@ void loop() {
       // Check Lora RX
       lora.update();
     } 
-    switchVar = checkInputs();
+    
     lora.sleep();
     wakeup_count = 0;
     count = 0;
@@ -162,64 +164,60 @@ void initLoraWithJoin(){
   // Join procedure End
 }
 
-byte * checkInputs(){
-  byte * switchVarTemp = 0;
+void checkInputs(){
   int countTime = 0;
   
   while(countTime <= 5){
-    if(millis() - previousMillisWhileInputs > 1000 || shiftIn(dataPin, clockPin) == 255){
-      countTime++;
-      previousMillisWhileInputs = millis();
-    }
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
-    byte * tempSwitch = shiftIn(dataPin, clockPin);
-   if(tempSwitch > switchVarTemp){
-      #if DEBUG
-      //Serial.println(switchVarTemp, BIN);
-      #endif
-      switchVarTemp = tempSwitch;
+          int i;
+          int temp = 0;
+          int pinState;
+          byte myDataIn[2] = {0,0};
+          byte test = 0;
+        
+          pinMode(clockPin, OUTPUT);
+          pinMode(dataPin, INPUT);
+        
+          for (i=15; i>=0; i--)
+          {
+            digitalWrite(clockPin, 0);
+            delayMicroseconds(0.2);
+            temp = digitalRead(dataPin);
+            if (temp) {
+              pinState = 1;
+              myDataIn[i/8] = myDataIn[i/8] | (1 << i%8); 
+            }
+            else {
+              pinState = 0;
+            }
+            digitalWrite(clockPin, 1);
+          }
+          
+    for(i = 0; i < 2; i++){
+       if(myDataIn[i] > payload[i]){
+        /*#if DEBUG
+        Serial.println("here");
+        Serial.println(myDataIn[i]);
+        #endif*/
+        payload[i] = myDataIn[i];
+      }
+    }
+    if(millis() - previousMillisWhileInputs > 1000){
+      countTime++;
+      previousMillisWhileInputs = millis();
+      /*Serial.println("outside");
+        Serial.println(myDataIn[0]);
+        Serial.println(myDataIn[1]);
+        Serial.println(test);
+        Serial.println(countTest);*/
     }
   }
-  //Serial.println(switchVarTemp);
-  return switchVarTemp;
 }
 
-size_t string_length(const char * s)
-{
-    size_t i = 0;
-    while (*s++ != '\0')
-        ++i;
-
-    return i;
-}
-
-byte *  concatenate(const byte * s1, const byte * s2)
-{
-    size_t l1 = string_length(s1);
-    size_t l2 = string_length(s2);
-
-    /// Step 1:
-    byte * p = new byte[l1 + l2 + 1];
-
-    /// Step 2:
-    for (size_t i = 0; i < l1; i++) {
-        p[i] = s1[i];
-    }
-    /// Step 3:
-    for (size_t i = 0; i < l2; i++) {
-        p[i + l1] = s2[i];
-    }
-
-    /// Step 4:
-    p[l1 + l2] = '\0';
-
-    return p;
-}
-
-byte * shiftIn(int myDataPin, int myClockPin) {
+/*byte * shiftIn(int myDataPin, int myClockPin) {
 
   int i;
   int temp = 0;
@@ -244,7 +242,7 @@ byte * shiftIn(int myDataPin, int myClockPin) {
     digitalWrite(myClockPin, 1);
   }
   return concatenate(myDataIn[0], myDataIn[1]);
-}
+}*/
 
 ISR(WDT_vect){
   asm("wdr");

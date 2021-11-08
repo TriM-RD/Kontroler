@@ -14,16 +14,17 @@
 
 #include <lorawan.h>
 
+
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047EA2"};
+const char devEui[] PROGMEM = {"70B3D57ED0047EAB"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"D87789608A49D137A6AFC3C9DBF68FA7"};
+const char appKey[] PROGMEM = {"6A19DD23F66C28E18E4EB959DFFCB698"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
 uint8_t count = 0;
 
-char myStr[50]; // + 5
+char myStr[20]; // + 5
 char outStr[255];
 byte recvStatus = 0;
 
@@ -37,7 +38,7 @@ const PROGMEM sRFM_pins RFM_pins = {
 };
 
 uint8_t wakeup_count = 3; //Change on two places
-uint8_t tx_buf[32]; // TX_BUF_SIZE +8
+//uint8_t tx_buf[32]; // TX_BUF_SIZE +8
 
 const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;

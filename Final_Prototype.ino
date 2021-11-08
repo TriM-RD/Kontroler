@@ -15,15 +15,15 @@
 #include <lorawan.h>
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047C68"};
+const char devEui[] PROGMEM = {"70B3D57ED0047E86"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"C216CE170246FA16CC67083CDC2B159C"};
+const char appKey[] PROGMEM = {"B963B602A2A74AD747D43B686E6DEF61"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
 uint8_t count = 0;
 
-char myStr[5];
+char myStr[50]; // + 5
 char outStr[255];
 byte recvStatus = 0;
 
@@ -36,13 +36,13 @@ const PROGMEM sRFM_pins RFM_pins = {
   .DIO5 = -1,
 };
 
-uint8_t wakeup_count = 10; //Change on two places
-uint8_t tx_buf[8]; // TX_BUF_SIZE
+uint8_t wakeup_count = 3; //Change on two places
+uint8_t tx_buf[32]; // TX_BUF_SIZE +8
 
 const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
-byte switchVar = 0;
+uint16_t switchVar = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -82,16 +82,16 @@ void setup() {
 
 void loop() {
   delay(1000);
-  if(wakeup_count >= 10)//Change on two places
+  if(wakeup_count >= 3)//Change on two places
   {
-    switchVar = checkInputs();
+    //switchVar = checkInputs();
     while(count <= 1){
       lora.wakeUp();
       if(millis() - previousMillis > 10000) {
-        //lora.wakeUp();
+        
         previousMillis = millis(); 
     
-        sprintf(myStr, "%d", switchVar); 
+        sprintf(myStr, "%u", switchVar); 
     
         Serial.print("Sending: ");
         Serial.println(myStr);
@@ -108,6 +108,7 @@ void loop() {
       // Check Lora RX
       lora.update();
     } 
+    switchVar = checkInputs();
     lora.sleep();
     wakeup_count = 0;
     count = 0;
@@ -161,8 +162,8 @@ void initLoraWithJoin(){
   // Join procedure End
 }
 
-byte checkInputs(){
-  byte switchVarTemp = 0;
+uint16_t checkInputs(){
+  uint16_t switchVarTemp = 0;
   int countTime = 0;
   
   while(countTime <= 5){
@@ -174,7 +175,7 @@ byte checkInputs(){
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
-    byte tempSwitch = shiftIn(dataPin, clockPin);
+    uint16_t tempSwitch = shiftIn(dataPin, clockPin);
     if(tempSwitch > switchVarTemp){
       #if DEBUG
       Serial.println(switchVarTemp, BIN);
@@ -191,17 +192,17 @@ byte checkInputs(){
   return switchVarTemp;
 }
 
-byte shiftIn(int myDataPin, int myClockPin) {
+uint16_t shiftIn(int myDataPin, int myClockPin) {
 
   int i;
   int temp = 0;
   int pinState;
-  byte myDataIn = 0;
+  uint16_t myDataIn = 0;
 
   pinMode(myClockPin, OUTPUT);
   pinMode(myDataPin, INPUT);
 
-  for (i=7; i>=0; i--)
+  for (i=15; i>=0; i--)
   {
     digitalWrite(myClockPin, 0);
     delayMicroseconds(0.2);

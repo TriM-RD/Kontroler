@@ -15,9 +15,9 @@
 #include <lorawan.h>
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047E86"};
+const char devEui[] PROGMEM = {"70B3D57ED0047E8F"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"B963B602A2A74AD747D43B686E6DEF61"};
+const char appKey[] PROGMEM = {"E0219C6AC3C36D93F0F9CB0C3790086E"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
@@ -42,7 +42,7 @@ uint8_t tx_buf[32]; // TX_BUF_SIZE +8
 const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
-uint16_t switchVar = 0;
+byte * switchVar = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -162,8 +162,8 @@ void initLoraWithJoin(){
   // Join procedure End
 }
 
-uint16_t checkInputs(){
-  uint16_t switchVarTemp = 0;
+byte * checkInputs(){
+  byte * switchVarTemp = 0;
   int countTime = 0;
   
   while(countTime <= 5){
@@ -175,29 +175,56 @@ uint16_t checkInputs(){
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
-    uint16_t tempSwitch = shiftIn(dataPin, clockPin);
-    if(tempSwitch > switchVarTemp){
+    byte * tempSwitch = shiftIn(dataPin, clockPin);
+   if(tempSwitch > switchVarTemp){
       #if DEBUG
-      Serial.println(switchVarTemp, BIN);
+      //Serial.println(switchVarTemp, BIN);
       #endif
       switchVarTemp = tempSwitch;
     }
-    /*#if DEBUG
-      if( bitRead(switchVarTemp, 7) == 1){
-        Serial.println(switchVarTemp, BIN);
-        Serial.println(String("vrata"));
-      }
-    #endif*/
   }
+  //Serial.println(switchVarTemp);
   return switchVarTemp;
 }
 
-uint16_t shiftIn(int myDataPin, int myClockPin) {
+size_t string_length(const char * s)
+{
+    size_t i = 0;
+    while (*s++ != '\0')
+        ++i;
+
+    return i;
+}
+
+byte *  concatenate(const byte * s1, const byte * s2)
+{
+    size_t l1 = string_length(s1);
+    size_t l2 = string_length(s2);
+
+    /// Step 1:
+    byte * p = new byte[l1 + l2 + 1];
+
+    /// Step 2:
+    for (size_t i = 0; i < l1; i++) {
+        p[i] = s1[i];
+    }
+    /// Step 3:
+    for (size_t i = 0; i < l2; i++) {
+        p[i + l1] = s2[i];
+    }
+
+    /// Step 4:
+    p[l1 + l2] = '\0';
+
+    return p;
+}
+
+byte * shiftIn(int myDataPin, int myClockPin) {
 
   int i;
   int temp = 0;
   int pinState;
-  uint16_t myDataIn = 0;
+  byte * myDataIn[2] = {0,0};
 
   pinMode(myClockPin, OUTPUT);
   pinMode(myDataPin, INPUT);
@@ -209,14 +236,14 @@ uint16_t shiftIn(int myDataPin, int myClockPin) {
     temp = digitalRead(myDataPin);
     if (temp) {
       pinState = 1;
-      myDataIn = myDataIn | (1 << i);
+      *myDataIn[i/8] = *myDataIn[i/8] | (1 << i);
     }
     else {
       pinState = 0;
     }
     digitalWrite(myClockPin, 1);
   }
-  return myDataIn;
+  return concatenate(myDataIn[0], myDataIn[1]);
 }
 
 ISR(WDT_vect){

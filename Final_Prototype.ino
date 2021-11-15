@@ -180,7 +180,9 @@ void getDht11Inputs(){
 
 void checkInputs(){
   int countTime = 0;
-  
+  for(int i = 0; i < 4; i++){
+       payload[i] = 0; 
+    }
   while(countTime <= 5){
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);

@@ -17,9 +17,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047EBE"};
+const char devEui[] PROGMEM = {"70B3D57ED0047EC8"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"624246474679964BED52FD7A935C5A75"};
+const char appKey[] PROGMEM = {"43C1A22201BABE274715925A13F70BEF"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
@@ -45,7 +45,7 @@ const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
 
-byte payload[4] = {0, 0, 0, 0};
+byte payload[6] = {0, 0, 0, 0, 0, 0};
 
 void setup() {
   Serial.begin(9600);
@@ -103,7 +103,7 @@ void loop() {
         Serial.println(myStr);
         
         //lora.sendUplink(myStr, strlen(myStr), 0, 1);
-        lora.sendUplink(payload, 4, 0, 1);
+        lora.sendUplink(payload, 6, 0, 1);
         count++;
       }
     
@@ -172,8 +172,8 @@ void initLoraWithJoin(){
 void getDht11Inputs(){
   do{
     delay(dht.getMinimumSamplingPeriod());
-    payload[2] = dht.getHumidity();
-    payload[3] = dht.getTemperature();
+    payload[4] = dht.getHumidity();
+    payload[5] = dht.getTemperature();
   }while(dht.getStatusString() != "OK");
   
 }
@@ -189,13 +189,13 @@ void checkInputs(){
           int i;
           int temp = 0;
           int pinState;
-          byte myDataIn[2] = {0,0};
+          byte myDataIn[4] = {0,0,0,0};
           byte test = 0;
         
           pinMode(clockPin, OUTPUT);
           pinMode(dataPin, INPUT);
         
-          for (i=15; i>=0; i--)
+          for (i=31; i>=0; i--)
           {
             digitalWrite(clockPin, 0);
             delayMicroseconds(0.2);
@@ -210,7 +210,7 @@ void checkInputs(){
             digitalWrite(clockPin, 1);
           }
           
-    for(i = 0; i < 2; i++){
+    for(i = 0; i < 4; i++){
        if(myDataIn[i] > payload[i]){
         /*#if DEBUG
         Serial.println("here");

@@ -10,14 +10,19 @@
  * please buy us a round!
  * Distributed as-is; no warranty is given.
  */
-#define DEBUG 0 // Treba biti 1 da bi radio program -_-
+#define DEBUG 0
+#include "DHT.h"
+
+DHT dht;
 
 unsigned long previousMillisWhileInputs = 0;
 int latchPin = 8;
 int dataPin = 9;
 int clockPin = 7;
 int led = 10;
-byte switchVar = 0;
+const int payload_size = 6;
+
+byte payload[payload_size] = {0, 0, 0, 0, 0, 0};
 
 void setup() {
 Serial.begin(9600); 
@@ -38,65 +43,69 @@ while(!Serial);
 #if TEMPSENSOR && DEBUG
   Serial.println("DHT11");
 #endif
+dht.setup(A0);
   //DHT11 End
 }
 
 void loop() {
   delay(1000);
   digitalWrite(led, HIGH);
-  switchVar = checkInputs();
-  Serial.println(switchVar);
-  delay(5000);
+  checkInputs();
+  getDht11Inputs();
+  Serial.write(payload, 6);
+  delay(10000);
   digitalWrite(led, LOW);
 }
 
-byte checkInputs(){
-  byte switchVarTemp = 0;
+void checkInputs(){
   int countTime = 0;
   
   while(countTime <= 5){
-    if(millis() - previousMillisWhileInputs > 1000 || shiftIn(dataPin, clockPin) == 255){
-      countTime++;
-      previousMillisWhileInputs = millis();
-    }
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
-    byte tempSwitch = shiftIn(dataPin, clockPin);
-    if(tempSwitch > switchVarTemp){
-      #if DEBUG
-      Serial.println(switchVarTemp, BIN);
-      #endif
-      switchVarTemp = tempSwitch;
+          int i;
+          int temp = 0;
+          int pinState;
+          byte myDataIn[4] = {0,0,0,0};
+          byte test = 0;
+        
+          pinMode(clockPin, OUTPUT);
+          pinMode(dataPin, INPUT);
+        
+          for (i=31; i>=0; i--)
+          {
+            digitalWrite(clockPin, 0);
+            delayMicroseconds(0.2);
+            temp = digitalRead(dataPin);
+            if (temp) {
+              pinState = 1;
+              myDataIn[i/8] = myDataIn[i/8] | (1 << i%8); 
+            }
+            else {
+              pinState = 0;
+            }
+            digitalWrite(clockPin, 1);
+          }
+          
+    for(i = 0; i < 4; i++){
+       if(myDataIn[i] > payload[i]){
+        payload[i] = myDataIn[i];
+      }
+    }
+    if(millis() - previousMillisWhileInputs > 1000){
+      countTime++;
+      previousMillisWhileInputs = millis();
     }
   }
-  return switchVarTemp;
 }
 
-byte shiftIn(int myDataPin, int myClockPin) {
-
-  int i;
-  int temp = 0;
-  int pinState;
-  byte myDataIn = 0;
-
-  pinMode(myClockPin, OUTPUT);
-  pinMode(myDataPin, INPUT);
-
-  for (i=7; i>=0; i--)
-  {
-    digitalWrite(myClockPin, 0);
-    delayMicroseconds(0.2);
-    temp = digitalRead(myDataPin);
-    if (temp) {
-      pinState = 1;
-      myDataIn = myDataIn | (1 << i);
-    }
-    else {
-      pinState = 0;
-    }
-    digitalWrite(myClockPin, 1);
-  }
-  return myDataIn;
+void getDht11Inputs(){
+  do{
+    delay(dht.getMinimumSamplingPeriod());
+    payload[payload_size-2] = dht.getTemperature();
+    payload[payload_size-1] = dht.getHumidity();
+  }while(dht.getStatusString() != "OK");
+  
 }

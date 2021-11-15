@@ -172,8 +172,8 @@ void initLoraWithJoin(){
 void getDht11Inputs(){
   do{
     delay(dht.getMinimumSamplingPeriod());
-    payload[4] = dht.getHumidity();
-    payload[5] = dht.getTemperature();
+    payload[4] = dht.getTemperature();
+    payload[5] = dht.getHumidity();
   }while(dht.getStatusString() != "OK");
   
 }
@@ -212,51 +212,15 @@ void checkInputs(){
           
     for(i = 0; i < 4; i++){
        if(myDataIn[i] > payload[i]){
-        /*#if DEBUG
-        Serial.println("here");
-        Serial.println(myDataIn[i]);
-        #endif*/
         payload[i] = myDataIn[i];
       }
     }
     if(millis() - previousMillisWhileInputs > 1000){
       countTime++;
       previousMillisWhileInputs = millis();
-      /*Serial.println("outside");
-        Serial.println(myDataIn[0]);
-        Serial.println(myDataIn[1]);
-        Serial.println(test);
-        Serial.println(countTest);*/
     }
   }
 }
-
-/*byte * shiftIn(int myDataPin, int myClockPin) {
-
-  int i;
-  int temp = 0;
-  int pinState;
-  byte * myDataIn[2] = {0,0};
-
-  pinMode(myClockPin, OUTPUT);
-  pinMode(myDataPin, INPUT);
-
-  for (i=15; i>=0; i--)
-  {
-    digitalWrite(myClockPin, 0);
-    delayMicroseconds(0.2);
-    temp = digitalRead(myDataPin);
-    if (temp) {
-      pinState = 1;
-      *myDataIn[i/8] = *myDataIn[i/8] | (1 << i);
-    }
-    else {
-      pinState = 0;
-    }
-    digitalWrite(myClockPin, 1);
-  }
-  return concatenate(myDataIn[0], myDataIn[1]);
-}*/
 
 ISR(WDT_vect){
   asm("wdr");

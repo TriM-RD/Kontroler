@@ -17,9 +17,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047EC8"};
+const char devEui[] PROGMEM = {"A248537D1F6591AE"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"43C1A22201BABE274715925A13F70BEF"};
+const char appKey[] PROGMEM = {"BEF568E376E0B1B0A3E8E05155843827"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
@@ -45,7 +45,7 @@ const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
 
-byte payload[6] = {0, 0, 0, 0, 0, 0};
+byte payload[2] = {0,0};
 
 void setup() {
   Serial.begin(9600);
@@ -88,7 +88,7 @@ void loop() {
   delay(1000);
   if(wakeup_count >= 3)//Change on two places
   {
-    checkInputs();
+    //checkInputs();
     getDht11Inputs();
     //switchVar = checkInputs();
     while(count <= 1){
@@ -103,7 +103,7 @@ void loop() {
         Serial.println(myStr);
         
         //lora.sendUplink(myStr, strlen(myStr), 0, 1);
-        lora.sendUplink(payload, 6, 0, 1);
+        lora.sendUplink(payload, 2, 0, 1);
         count++;
       }
     
@@ -170,11 +170,13 @@ void initLoraWithJoin(){
 }
 
 void getDht11Inputs(){
+  int i = 0;
   do{
     delay(dht.getMinimumSamplingPeriod());
-    payload[4] = dht.getTemperature();
-    payload[5] = dht.getHumidity();
-  }while(dht.getStatusString() != "OK");
+    payload[0] = dht.getTemperature();
+    payload[1] = dht.getHumidity();
+    i++;
+  }while(dht.getStatusString() != "OK" && i <  10);
   
 }
 

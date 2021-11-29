@@ -26,9 +26,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED004914A"};
+const char devEui[] PROGMEM = {"70B3D57ED0049156"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"12B469C94E1D3B8DD07E0F833A4FD33E"};
+const char appKey[] PROGMEM = {"D0A142CCBACA1754C4FAA909DD985C56"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
@@ -98,12 +98,10 @@ void loop() {
   {
     checkInputs();
     getDht11Inputs();
-    while(statusChanged){
+    //if(statusChanged){
       //lora.wakeUp();
-      unsigned long currentMillis = millis();
-      if((unsigned long)(currentMillis - previousMillis) >= 10000) {
-        
-        previousMillis = millis(); 
+      if(/*(unsigned long)(millis() - previousMillis) >= 10000*/statusChanged) {
+        //previousMillis = millis(); 
     
         debugln("Sending: ");
         debugln(myStr);
@@ -111,15 +109,16 @@ void loop() {
         lora.sendUplink(payload, 6, 0, 1);
         statusChanged = false;
       }
-    
-      /*recvStatus = lora.readData(outStr);
+
+      
+      recvStatus = lora.readData(outStr);
       if(recvStatus) {
         debugln(outStr);
-      }*/
+      }
       
       // Check Lora RX
       lora.update();
-    } 
+    //} 
     
     //lora.sleep();
     wakeup_count = 0;
@@ -223,8 +222,7 @@ void checkInputs(){
         tempPayload[i] = myDataIn[i];
       }
     }
-    unsigned long currentMillis = millis();
-    if((unsigned long)(currentMillis - previousMillisWhileInputs) >= 2000){
+    if((unsigned long)(millis() - previousMillisWhileInputs) >= 2000){
       countTime++;
       previousMillisWhileInputs = millis();
     }

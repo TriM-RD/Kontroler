@@ -11,19 +11,28 @@
  * Distributed as-is; no warranty is given.
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
+#if DEBUG
+  #define debug(x) Serial.print(x)
+  #define debugln(x) Serial.println(x)
+  #define beginSerial() Serial.begin(9600)
+#else
+  #define debug(x)
+  #define debugln(x)
+  #define beginSerial()
+#endif
 #include <lorawan.h>
 #include "DHT.h"
 
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047EC8"};
+const char devEui[] PROGMEM = {"70B3D57ED004914A"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"43C1A22201BABE274715925A13F70BEF"};
+const char appKey[] PROGMEM = {"12B469C94E1D3B8DD07E0F833A4FD33E"};
 
 unsigned long previousMillisWhileInputs = 0;
 unsigned long previousMillis = 0;
-uint8_t count = 0;
+bool statusChanged = true;
 
 char myStr[10]; // + 5
 char outStr[255];
@@ -35,23 +44,21 @@ const PROGMEM sRFM_pins RFM_pins = {
   .DIO0 = 2,
   .DIO1 = 3,
   .DIO2 = 4,
-  .DIO5 = -1,
+  .DIO5 = 15,
 };
 
 uint8_t wakeup_count = 3; //Change on two places
-//uint8_t tx_buf[32]; // TX_BUF_SIZE +8
 
 const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
 
+const int PROGMEM dhtCtrl = A1;
+
 byte payload[6] = {0, 0, 0, 0, 0, 0};
 
 void setup() {
-  Serial.begin(9600);
-/*#if DEBUG 
-  while(!Serial);
-#endif*/
+  beginSerial();
   //Watchdog
   ADCSRA = 0;
 
@@ -68,15 +75,16 @@ void setup() {
   pinMode(clockPin, OUTPUT);
   pinMode(dataPin, INPUT);
 #if DEBUG
-  Serial.println(String("More Inputs"));
+  debugln(String("More Inputs"));
 #endif
   //More Inputs End
 
   //DHT11
 #if TEMPSENSOR && DEBUG
-  Serial.println("DHT11");
+  debugln("DHT11");
 #endif
-dht.setup(A0);
+dht.setup(10);
+pinMode(dhtCtrl, OUTPUT);
   //DHT11 End
   
   //Lora Init
@@ -85,56 +93,53 @@ dht.setup(A0);
 }
 
 void loop() {
-  delay(1000);
-  if(wakeup_count >= 3)//Change on two places
+  //delay(1000);
+  if(wakeup_count >= 0)//Change on two places
   {
     checkInputs();
     getDht11Inputs();
-    //switchVar = checkInputs();
-    while(count <= 1){
-      lora.wakeUp();
-      if(millis() - previousMillis > 10000) {
+    while(statusChanged){
+      //lora.wakeUp();
+      unsigned long currentMillis = millis();
+      if((unsigned long)(currentMillis - previousMillis) >= 10000) {
         
         previousMillis = millis(); 
     
-        //sprintf(myStr, "%u", switchVar); 
-    
-        Serial.print("Sending: ");
-        Serial.println(myStr);
-        
-        //lora.sendUplink(myStr, strlen(myStr), 0, 1);
+        debugln("Sending: ");
+        debugln(myStr);
+     
         lora.sendUplink(payload, 6, 0, 1);
-        count++;
+        statusChanged = false;
       }
     
-      recvStatus = lora.readData(outStr);
+      /*recvStatus = lora.readData(outStr);
       if(recvStatus) {
-        Serial.println(outStr);
-      }
+        debugln(outStr);
+      }*/
       
       // Check Lora RX
       lora.update();
     } 
     
-    lora.sleep();
+    //lora.sleep();
     wakeup_count = 0;
-    count = 0;
   }
   wakeup_count++;
   delay(1000);
-  goToSleep();
+  //goToSleep();
 }
 
 void initLoraWithJoin(){
   //Lora Init
   if(!lora.init()){
     #if DEBUG
-    Serial.println("RFM95 not detected");
+    debugln("RFM95 not detected");
     #endif
     delay(5000);
     return;
   }
   lora.setDeviceClass(CLASS_A);
+  lora.setTxPower(15,PA_BOOST_PIN);
   lora.setDataRate(SF9BW125);
   lora.setChannel(MULTI);
   char output1[16];
@@ -158,31 +163,32 @@ void initLoraWithJoin(){
   bool isJoined;
   do {
     #if DEBUG
-    Serial.println("Joining...");
+    debugln("Joining...");
     #endif
     isJoined = lora.join();
     delay(5000);
   }while(!isJoined);
   #if DEBUG
-  Serial.println("Joined to network");
+  debugln("Joined to network");
   #endif
   // Join procedure End
 }
 
 void getDht11Inputs(){
+  int timeCount = 0;
   do{
     delay(dht.getMinimumSamplingPeriod());
     payload[4] = dht.getTemperature();
     payload[5] = dht.getHumidity();
-  }while(dht.getStatusString() != "OK");
+    timeCount++;
+  }while(dht.getStatusString() != "OK" && timeCount <= 10);
   
 }
 
 void checkInputs(){
+  digitalWrite(dhtCtrl, HIGH);
   int countTime = 0;
-  for(int i = 0; i < 4; i++){
-       payload[i] = 0; 
-    }
+  byte tempPayload[4] = {0,0,0,0};
   while(countTime <= 5){
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
@@ -213,14 +219,27 @@ void checkInputs(){
           }
           
     for(i = 0; i < 4; i++){
-       if(myDataIn[i] > payload[i]){
-        payload[i] = myDataIn[i];
+       if(myDataIn[i] > tempPayload[i]){
+        tempPayload[i] = myDataIn[i];
       }
     }
-    if(millis() - previousMillisWhileInputs > 1000){
+    unsigned long currentMillis = millis();
+    if((unsigned long)(currentMillis - previousMillisWhileInputs) >= 2000){
       countTime++;
       previousMillisWhileInputs = millis();
     }
+  }
+  digitalWrite(dhtCtrl, LOW);
+  for(int i = 0; i < 4; i++){
+    if(payload[i] != tempPayload[i]){
+      payload[i] = tempPayload[i];
+      statusChanged = true;
+    }
+  } 
+  if(statusChanged){
+    return;
+  }else{
+    statusChanged = false;
   }
 }
 

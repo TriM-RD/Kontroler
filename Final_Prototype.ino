@@ -26,16 +26,18 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0049156"};
+const char devEui[] PROGMEM = {"70B3D57ED0049275"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"D0A142CCBACA1754C4FAA909DD985C56"};
+const char appKey[] PROGMEM = {"1175F2B58774387DE3DB890298CD700B"};
 
 unsigned long previousMillisWhileInputs = 0;
-unsigned long previousMillis = 0;
+  //unsigned long previousMillis = 0;
 bool statusChanged = true;
+uint8_t wakeup_count = 3; //Change on two places
 
-char myStr[10]; // + 5
-char outStr[255];
+char outStr[255];  
+byte payload[6] = {0, 0, 0, 0, 0, 0};
+
 byte recvStatus = 0;
 
 const PROGMEM sRFM_pins RFM_pins = {
@@ -44,10 +46,8 @@ const PROGMEM sRFM_pins RFM_pins = {
   .DIO0 = 2,
   .DIO1 = 3,
   .DIO2 = 4,
-  .DIO5 = 15,
+  .DIO5 = A5,
 };
-
-uint8_t wakeup_count = 3; //Change on two places
 
 const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
@@ -55,7 +55,7 @@ const int PROGMEM clockPin = 7;
 
 const int PROGMEM dhtCtrl = A1;
 
-byte payload[6] = {0, 0, 0, 0, 0, 0};
+
 
 void setup() {
   beginSerial();
@@ -104,7 +104,7 @@ void loop() {
         //previousMillis = millis(); 
     
         debugln("Sending: ");
-        debugln(myStr);
+        //debugln(myStr);
      
         lora.sendUplink(payload, 6, 0, 1);
         statusChanged = false;
@@ -174,13 +174,15 @@ void initLoraWithJoin(){
 }
 
 void getDht11Inputs(){
-  int timeCount = 0;
-  do{
-    delay(dht.getMinimumSamplingPeriod());
-    payload[4] = dht.getTemperature();
-    payload[5] = dht.getHumidity();
-    timeCount++;
-  }while(dht.getStatusString() != "OK" && timeCount <= 10);
+  if(statusChanged){
+    int timeCount = 0;
+    do{
+      delay(dht.getMinimumSamplingPeriod());
+      payload[4] = dht.getTemperature();
+      payload[5] = dht.getHumidity();
+      timeCount++;
+    }while(dht.getStatusString() != "OK" && timeCount <= 10);  
+  }
   
 }
 
@@ -235,7 +237,7 @@ void checkInputs(){
     }
   } 
   if(statusChanged){
-    return;
+    statusChanged = true;
   }else{
     statusChanged = false;
   }

@@ -26,9 +26,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0049275"};
+const char devEui[] PROGMEM = {"70B3D57ED004943D"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"1175F2B58774387DE3DB890298CD700B"};
+const char appKey[] PROGMEM = {"24A5DA30235692FCFC9496E2346AE5ED"};
 
 unsigned long previousMillisWhileInputs = 0;
   //unsigned long previousMillis = 0;
@@ -181,7 +181,7 @@ void getDht11Inputs(){
       payload[4] = dht.getTemperature();
       payload[5] = dht.getHumidity();
       timeCount++;
-    }while(dht.getStatusString() != "OK" && timeCount <= 10);  
+    }while(dht.getStatusString() != "OK" && timeCount <= 100);  
   }
   
 }

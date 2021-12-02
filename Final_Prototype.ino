@@ -26,9 +26,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0049465"};
+const char devEui[] PROGMEM = {"70B3D57ED0048F88"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"7F4DC6820C41436DCFF859B3F718A208"};
+const char appKey[] PROGMEM = {"1D91F9684CB069F4AA0ADD2761F9ECE3"};
 
 unsigned long previousMillisWhileInputs = 0;
   //unsigned long previousMillis = 0;
@@ -197,8 +197,6 @@ void getDht11Inputs(){
     }while(dht.getStatusString() != "OK" && timeCount <= 5);   
     if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
       statusChanged = true;
-    }
-    if(humDHT != 0){
       payload[4] = tempDHT;
       payload[5] = humDHT;  
     }

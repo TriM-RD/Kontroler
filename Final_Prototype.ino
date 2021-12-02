@@ -26,9 +26,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED004943D"};
+const char devEui[] PROGMEM = {"70B3D57ED0049465"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"24A5DA30235692FCFC9496E2346AE5ED"};
+const char appKey[] PROGMEM = {"7F4DC6820C41436DCFF859B3F718A208"};
 
 unsigned long previousMillisWhileInputs = 0;
   //unsigned long previousMillis = 0;
@@ -53,8 +53,8 @@ const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
 
-const int PROGMEM dhtCtrl = A1;
-
+const int PROGMEM inputsCtrl = A1;
+const int PROGMEM ledCtrl = A4;
 
 
 void setup() {
@@ -69,11 +69,17 @@ void setup() {
         //(1 << PRUSART0) |
         (1 << PRADC);
   //Watchdog End
+
+  //LED
+  pinMode(ledCtrl, OUTPUT);
+  digitalWrite(ledCtrl, 1);
+  //LED End
   
   //More Inputs
   pinMode(latchPin, OUTPUT);
   pinMode(clockPin, OUTPUT);
   pinMode(dataPin, INPUT);
+  pinMode(inputsCtrl, OUTPUT);
 #if DEBUG
   debugln(String("More Inputs"));
 #endif
@@ -84,7 +90,6 @@ void setup() {
   debugln("DHT11");
 #endif
 dht.setup(10);
-pinMode(dhtCtrl, OUTPUT);
   //DHT11 End
   
   //Lora Init
@@ -171,23 +176,36 @@ void initLoraWithJoin(){
   debugln("Joined to network");
   #endif
   // Join procedure End
+  digitalWrite(ledCtrl, 0);
+  delay(500);
+  digitalWrite(ledCtrl, 1);
+  delay(500);
+  digitalWrite(ledCtrl, 0);
+  delay(500);
+  digitalWrite(ledCtrl, 1);
 }
 
 void getDht11Inputs(){
-  if(statusChanged){
+    byte tempDHT = 0;
+    byte humDHT = 0;
     int timeCount = 0;
     do{
       delay(dht.getMinimumSamplingPeriod());
-      payload[4] = dht.getTemperature();
-      payload[5] = dht.getHumidity();
+      tempDHT = dht.getTemperature();
+      humDHT = dht.getHumidity();
       timeCount++;
-    }while(dht.getStatusString() != "OK" && timeCount <= 100);  
-  }
-  
+    }while(dht.getStatusString() != "OK" && timeCount <= 5);   
+    if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
+      statusChanged = true;
+    }
+    if(humDHT != 0){
+      payload[4] = tempDHT;
+      payload[5] = humDHT;  
+    }
 }
 
 void checkInputs(){
-  digitalWrite(dhtCtrl, HIGH);
+  digitalWrite(inputsCtrl, HIGH);
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
   while(countTime <= 5){
@@ -229,7 +247,7 @@ void checkInputs(){
       previousMillisWhileInputs = millis();
     }
   }
-  digitalWrite(dhtCtrl, LOW);
+  digitalWrite(inputsCtrl, LOW);
   for(int i = 0; i < 4; i++){
     if(payload[i] != tempPayload[i]){
       payload[i] = tempPayload[i];

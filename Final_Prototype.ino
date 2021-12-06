@@ -13,6 +13,7 @@
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
 #if DEBUG
   #define debug(x) Serial.print(x)
+  #define debug(x) Serial.print(x)
   #define debugln(x) Serial.println(x)
   #define beginSerial() Serial.begin(9600)
 #else
@@ -231,6 +232,8 @@ void checkInputs(){
 
 void readSensor()
 {
+  debugln("BeforeStart");
+        debug(freeRam());
   delay(1000);
   // Make sure we don't poll the sensor too often
   // - Max sample rate DHT11 is 1 Hz   (duty cicle 1000 ms)
@@ -254,7 +257,8 @@ void readSensor()
   //uint16_t rawHumidity = 0;
   uint16_t rawTemperature = 0;
   uint16_t data = 0;
-
+  debugln("AfterStart");
+        debug(freeRam());
   for ( int8_t i = -3 ; i < 2 * 40; i++ ) {
     byte age;
     startTime = micros();
@@ -262,6 +266,8 @@ void readSensor()
     do {
       age = (unsigned long)(micros() - startTime);
       if ( age > 90 ) {
+        debugln("AGE");
+        debug(freeRam());
         //error = ERROR_TIMEOUT;
         debugln("TIMEOUT");
         return;
@@ -284,6 +290,8 @@ void readSensor()
         rawHumidity = data;
         break;*/
       case 63:
+        debugln("WORKING");
+        debug(freeRam());
         rawTemperature = data;
         data = 0;
         break;
@@ -291,7 +299,7 @@ void readSensor()
   }
 
   // Store readings
-
+  debugln(freeRam());
   humDHT = 0;
   tempDHT = rawTemperature >> 8;
 }

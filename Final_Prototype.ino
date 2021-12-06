@@ -164,7 +164,7 @@ void getDht11Inputs(){
     do{
       readSensor();
       timeCount++;
-    }while(timeCount <= 5);   
+    }while(timeCount <= 100);   
     if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
       statusChanged = true;
       payload[4] = tempDHT;
@@ -232,9 +232,7 @@ void checkInputs(){
 
 void readSensor()
 {
-  debugln("BeforeStart");
-        debug(freeRam());
-  delay(1000);
+  //delay(1000);
   // Make sure we don't poll the sensor too often
   // - Max sample rate DHT11 is 1 Hz   (duty cicle 1000 ms)
   // - Max sample rate DHT22 is 0.5 Hz (duty cicle 2000 ms)
@@ -254,11 +252,9 @@ void readSensor()
   // - Then 40 bits: RISING and then a FALLING edge per bit
   // To keep our code simple, we accept any HIGH or LOW reading if it's max 85 usecs long
 
-  //uint16_t rawHumidity = 0;
+  uint16_t rawHumidity = 0;
   uint16_t rawTemperature = 0;
   uint16_t data = 0;
-  debugln("AfterStart");
-        debug(freeRam());
   for ( int8_t i = -3 ; i < 2 * 40; i++ ) {
     byte age;
     startTime = micros();
@@ -266,10 +262,7 @@ void readSensor()
     do {
       age = (unsigned long)(micros() - startTime);
       if ( age > 90 ) {
-        debugln("AGE");
-        debug(freeRam());
         //error = ERROR_TIMEOUT;
-        debugln("TIMEOUT");
         return;
       }
     }
@@ -286,21 +279,23 @@ void readSensor()
     }
 
     switch ( i ) {
-      /*case 31:
+      case 31:
         rawHumidity = data;
-        break;*/
+        break;
       case 63:
-        debugln("WORKING");
-        debug(freeRam());
         rawTemperature = data;
         data = 0;
         break;
     }
   }
 
+  if ( (byte)(((byte)rawHumidity) + (rawHumidity >> 8) + ((byte)rawTemperature) + (rawTemperature >> 8)) != data ) {
+    //error = ERROR_CHECKSUM;
+    return;
+  }
+
   // Store readings
-  debugln(freeRam());
-  humDHT = 0;
+  humDHT = rawHumidity >> 8;
   tempDHT = rawTemperature >> 8;
 }
 

@@ -11,20 +11,30 @@
  * Distributed as-is; no warranty is given.
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
-
+#if DEBUG
+  #define debug(x) Serial.print(x)
+  #define debugln(x) Serial.println(x)
+  #define beginSerial() Serial.begin(9600)
+#else
+  #define debug(x)
+  #define debugln(x)
+  #define beginSerial()
+#endif
 #include <lorawan.h>
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0047EA2"};
+const char devEui[] PROGMEM = {"70B3D57ED0049759"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"D87789608A49D137A6AFC3C9DBF68FA7"};
+const char appKey[] PROGMEM = {"682C6C2FC30EA122F8A375D36344EC61"};
 
 unsigned long previousMillisWhileInputs = 0;
-unsigned long previousMillis = 0;
-uint8_t count = 0;
+  //unsigned long previousMillis = 0;
+bool statusChanged = true;
+uint8_t wakeup_count = 3; //Change on two places
 
-char myStr[50]; // + 5
-char outStr[255];
+char outStr[255];  
+byte payload[6] = {0, 0, 0, 0, 0, 0};
+
 byte recvStatus = 0;
 
 const PROGMEM sRFM_pins RFM_pins = {
@@ -33,22 +43,22 @@ const PROGMEM sRFM_pins RFM_pins = {
   .DIO0 = 2,
   .DIO1 = 3,
   .DIO2 = 4,
-  .DIO5 = -1,
+  .DIO5 = A5,
 };
-
-uint8_t wakeup_count = 3; //Change on two places
-uint8_t tx_buf[32]; // TX_BUF_SIZE +8
 
 const int PROGMEM latchPin = 8;
 const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
-byte payload[2] = {0,0};
+
+const int PROGMEM inputsCtrl = A1;
+const int PROGMEM ledCtrl = A4;
+
+byte tempDHT = 0;
+byte humDHT = 0;
 
 void setup() {
-  Serial.begin(9600);
-/*#if DEBUG 
-  while(!Serial);
-#endif*/
+  delay(1000);
+  beginSerial();
   //Watchdog
   ADCSRA = 0;
 
@@ -59,20 +69,27 @@ void setup() {
         //(1 << PRUSART0) |
         (1 << PRADC);
   //Watchdog End
+
+  //LED
+  pinMode(ledCtrl, OUTPUT);
+  digitalWrite(ledCtrl, 1);
+  //LED End
   
   //More Inputs
   pinMode(latchPin, OUTPUT);
   pinMode(clockPin, OUTPUT);
   pinMode(dataPin, INPUT);
+  pinMode(inputsCtrl, OUTPUT);
 #if DEBUG
-  Serial.println(String("More Inputs"));
+  debugln(String("More Inputs"));
 #endif
   //More Inputs End
 
   //DHT11
 #if TEMPSENSOR && DEBUG
-  Serial.println("DHT11");
+  debugln("DHT11");
 #endif
+readSensor();
   //DHT11 End
   
   //Lora Init
@@ -81,55 +98,21 @@ void setup() {
 }
 
 void loop() {
-  delay(1000);
-  if(wakeup_count >= 3)//Change on two places
-  {
     checkInputs();
-    //switchVar = checkInputs();
-    while(count <= 1){
-      lora.wakeUp();
-      if(millis() - previousMillis > 10000) {
-        
-        previousMillis = millis(); 
-    
-        //sprintf(myStr, "%u", switchVar); 
-    
-        Serial.print("Sending: ");
-        Serial.println(myStr);
-        
-        //lora.sendUplink(myStr, strlen(myStr), 0, 1);
-        lora.sendUplink(payload, 2, 0, 1);
-        count++;
-      }
-    
-      recvStatus = lora.readData(outStr);
-      if(recvStatus) {
-        Serial.println(outStr);
-      }
-      
-      // Check Lora RX
-      lora.update();
-    } 
-    
-    lora.sleep();
-    wakeup_count = 0;
-    count = 0;
-  }
-  wakeup_count++;
-  delay(1000);
-  goToSleep();
+    getDht11Inputs();
 }
 
 void initLoraWithJoin(){
   //Lora Init
   if(!lora.init()){
     #if DEBUG
-    Serial.println("RFM95 not detected");
+    debugln("RFM95 not detected");
     #endif
     delay(5000);
     return;
   }
   lora.setDeviceClass(CLASS_A);
+  lora.setTxPower(15,PA_BOOST_PIN);
   lora.setDataRate(SF9BW125);
   lora.setChannel(MULTI);
   char output1[16];
@@ -153,20 +136,46 @@ void initLoraWithJoin(){
   bool isJoined;
   do {
     #if DEBUG
-    Serial.println("Joining...");
+    debugln("Joining...");
     #endif
     isJoined = lora.join();
     delay(5000);
   }while(!isJoined);
   #if DEBUG
-  Serial.println("Joined to network");
+  debugln("Joined to network");
   #endif
   // Join procedure End
+  digitalWrite(ledCtrl, 0);
+  delay(500);
+  digitalWrite(ledCtrl, 1);
+  delay(500);
+  digitalWrite(ledCtrl, 0);
+  delay(500);
+  digitalWrite(ledCtrl, 1);
+  delay(500);
+  digitalWrite(ledCtrl, 0);
+  delay(500);
+  digitalWrite(ledCtrl, 1);
+}
+
+void getDht11Inputs(){
+    int timeCount = 0;
+    do{
+      readSensor();
+      timeCount++;
+    }while(timeCount <= 5);   
+    if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
+      statusChanged = true;
+      payload[4] = tempDHT;
+      payload[5] = humDHT;  
+    }
+    debugln(tempDHT);
 }
 
 void checkInputs(){
+  digitalWrite(inputsCtrl, HIGH);
   int countTime = 0;
-  
+  byte tempPayload[4] = {0,0,0,0};
   while(countTime <= 5){
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
@@ -175,13 +184,13 @@ void checkInputs(){
           int i;
           int temp = 0;
           int pinState;
-          byte myDataIn[2] = {0,0};
+          byte myDataIn[4] = {0,0,0,0};
           byte test = 0;
         
           pinMode(clockPin, OUTPUT);
           pinMode(dataPin, INPUT);
         
-          for (i=15; i>=0; i--)
+          for (i=31; i>=0; i--)
           {
             digitalWrite(clockPin, 0);
             delayMicroseconds(0.2);
@@ -196,53 +205,102 @@ void checkInputs(){
             digitalWrite(clockPin, 1);
           }
           
-    for(i = 0; i < 2; i++){
-       if(myDataIn[i] > payload[i]){
-        /*#if DEBUG
-        Serial.println("here");
-        Serial.println(myDataIn[i]);
-        #endif*/
-        payload[i] = myDataIn[i];
+    for(i = 0; i < 4; i++){
+       if(myDataIn[i] > tempPayload[i]){
+        tempPayload[i] = myDataIn[i];
       }
     }
-    if(millis() - previousMillisWhileInputs > 1000){
+    if((unsigned long)(millis() - previousMillisWhileInputs) >= 2000){
       countTime++;
       previousMillisWhileInputs = millis();
-      /*Serial.println("outside");
-        Serial.println(myDataIn[0]);
-        Serial.println(myDataIn[1]);
-        Serial.println(test);
-        Serial.println(countTest);*/
     }
+  }
+  digitalWrite(inputsCtrl, LOW);
+  for(int i = 0; i < 4; i++){
+    if(payload[i] != tempPayload[i]){
+      payload[i] = tempPayload[i];
+      statusChanged = true;
+    }
+  } 
+  if(statusChanged){
+    statusChanged = true;
+  }else{
+    statusChanged = false;
   }
 }
 
-/*byte * shiftIn(int myDataPin, int myClockPin) {
+void readSensor()
+{
+  delay(1000);
+  // Make sure we don't poll the sensor too often
+  // - Max sample rate DHT11 is 1 Hz   (duty cicle 1000 ms)
+  // - Max sample rate DHT22 is 0.5 Hz (duty cicle 2000 ms)
+  unsigned long startTime = millis();
 
-  int i;
-  int temp = 0;
-  int pinState;
-  byte * myDataIn[2] = {0,0};
+  // Request sample
 
-  pinMode(myClockPin, OUTPUT);
-  pinMode(myDataPin, INPUT);
+  digitalWrite(10, LOW); // Send start signal
+  pinMode(10, OUTPUT);
+  delay(18);
 
-  for (i=15; i>=0; i--)
-  {
-    digitalWrite(myClockPin, 0);
-    delayMicroseconds(0.2);
-    temp = digitalRead(myDataPin);
-    if (temp) {
-      pinState = 1;
-      *myDataIn[i/8] = *myDataIn[i/8] | (1 << i);
+  pinMode(10, INPUT);
+  digitalWrite(10, HIGH); // Switch bus to receive data
+
+  // We're going to read 83 edges:
+  // - First a FALLING, RISING, and FALLING edge for the start bit
+  // - Then 40 bits: RISING and then a FALLING edge per bit
+  // To keep our code simple, we accept any HIGH or LOW reading if it's max 85 usecs long
+
+  //uint16_t rawHumidity = 0;
+  uint16_t rawTemperature = 0;
+  uint16_t data = 0;
+
+  for ( int8_t i = -3 ; i < 2 * 40; i++ ) {
+    byte age;
+    startTime = micros();
+
+    do {
+      age = (unsigned long)(micros() - startTime);
+      if ( age > 90 ) {
+        //error = ERROR_TIMEOUT;
+        debugln("TIMEOUT");
+        return;
+      }
     }
-    else {
-      pinState = 0;
+    while ( digitalRead(10) == (i & 1) ? HIGH : LOW );
+
+    if ( i >= 0 && (i & 1) ) {
+      // Now we are being fed our 40 bits
+      data <<= 1;
+
+      // A zero max 30 usecs, a one at least 68 usecs.
+      if ( age > 30 ) {
+        data |= 1; // we got a one
+      }
     }
-    digitalWrite(myClockPin, 1);
+
+    switch ( i ) {
+      /*case 31:
+        rawHumidity = data;
+        break;*/
+      case 63:
+        rawTemperature = data;
+        data = 0;
+        break;
+    }
   }
-  return concatenate(myDataIn[0], myDataIn[1]);
-}*/
+
+  // Store readings
+
+  humDHT = 0;
+  tempDHT = rawTemperature >> 8;
+}
+
+int freeRam () {
+  extern int __heap_start, *__brkval; 
+  int v; 
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+}
 
 ISR(WDT_vect){
   asm("wdr");

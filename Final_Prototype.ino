@@ -26,12 +26,12 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0048F88"};
+const char devEui[] PROGMEM = {"70B3D57ED0049759"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"1D91F9684CB069F4AA0ADD2761F9ECE3"};
+const char appKey[] PROGMEM = {"682C6C2FC30EA122F8A375D36344EC61"};
 
-unsigned long previousMillisWhileInputs = 0;
-  //unsigned long previousMillis = 0;
+unsigned long prevMillisLora;
+unsigned long prevMillisInputs;
 bool statusChanged = true;
 uint8_t wakeup_count = 3; //Change on two places
 
@@ -56,6 +56,8 @@ const int PROGMEM clockPin = 7;
 const int PROGMEM inputsCtrl = A1;
 const int PROGMEM ledCtrl = A4;
 
+byte tempDHT = 0;
+byte humDHT = 0;
 
 void setup() {
   beginSerial();
@@ -105,8 +107,8 @@ void loop() {
     getDht11Inputs();
     //if(statusChanged){
       //lora.wakeUp();
-      if(/*(unsigned long)(millis() - previousMillis) >= 10000*/statusChanged) {
-        //previousMillis = millis(); 
+      if((unsigned long)(millis() - prevMillisLora) >= 9000 || statusChanged) {
+        prevMillisLora = millis(); 
     
         debugln("Sending: ");
         //debugln(myStr);
@@ -186,15 +188,7 @@ void initLoraWithJoin(){
 }
 
 void getDht11Inputs(){
-    byte tempDHT = 0;
-    byte humDHT = 0;
-    int timeCount = 0;
-    do{
-      delay(dht.getMinimumSamplingPeriod());
-      tempDHT = dht.getTemperature();
-      humDHT = dht.getHumidity();
-      timeCount++;
-    }while(dht.getStatusString() != "OK" && timeCount <= 5);   
+    readSensor(); 
     if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
       statusChanged = true;
       payload[4] = tempDHT;
@@ -240,9 +234,9 @@ void checkInputs(){
         tempPayload[i] = myDataIn[i];
       }
     }
-    if((unsigned long)(millis() - previousMillisWhileInputs) >= 2000){
+    if((unsigned long)(millis() - prevMillisInputs) >= 2000){
       countTime++;
-      previousMillisWhileInputs = millis();
+      prevMillisInputs = millis();
     }
   }
   digitalWrite(inputsCtrl, LOW);
@@ -257,6 +251,76 @@ void checkInputs(){
   }else{
     statusChanged = false;
   }
+}
+
+void readSensor()
+{
+  // Make sure we don't poll the sensor too often
+  // - Max sample rate DHT11 is 1 Hz   (duty cicle 1000 ms)
+  // - Max sample rate DHT22 is 0.5 Hz (duty cicle 2000 ms)
+  unsigned long startTime = millis();
+
+  // Request sample
+
+  digitalWrite(10, LOW); // Send start signal
+  pinMode(10, OUTPUT);
+  delay(18);
+
+  pinMode(10, INPUT);
+  digitalWrite(10, HIGH); // Switch bus to receive data
+
+  // We're going to read 83 edges:
+  // - First a FALLING, RISING, and FALLING edge for the start bit
+  // - Then 40 bits: RISING and then a FALLING edge per bit
+  // To keep our code simple, we accept any HIGH or LOW reading if it's max 85 usecs long
+
+  uint16_t rawHumidity = 0;
+  uint16_t rawTemperature = 0;
+  uint16_t data = 0;
+
+  for ( int8_t i = -3 ; i < 2 * 40; i++ ) {
+    byte age;
+    startTime = micros();
+
+    do {
+      age = (unsigned long)(micros() - startTime);
+      if ( age > 90 ) {
+        //error = ERROR_TIMEOUT;
+        return;
+      }
+    }
+    while ( digitalRead(10) == (i & 1) ? HIGH : LOW );
+
+    if ( i >= 0 && (i & 1) ) {
+      // Now we are being fed our 40 bits
+      data <<= 1;
+
+      // A zero max 30 usecs, a one at least 68 usecs.
+      if ( age > 30 ) {
+        data |= 1; // we got a one
+      }
+    }
+
+    switch ( i ) {
+      case 31:
+        rawHumidity = data;
+        break;
+      case 63:
+        rawTemperature = data;
+        data = 0;
+        break;
+    }
+  }
+
+  if ( (byte)(((byte)rawHumidity) + (rawHumidity >> 8) + ((byte)rawTemperature) + (rawTemperature >> 8)) != data ) {
+    //error = ERROR_CHECKSUM;
+    return;
+  }
+
+  // Store readings
+
+  humDHT = rawHumidity >> 8;
+  tempDHT = rawTemperature >> 8;
 }
 
 ISR(WDT_vect){

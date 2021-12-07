@@ -19,8 +19,9 @@ unsigned long previousMillisWhileInputs = 0;
 int latchPin = 8;
 int dataPin = 9;
 int clockPin = 7;
-int led = 10;
+int led = A4;
 const int payload_size = 6;
+const int PROGMEM inputsCtrl = A1;
 
 byte payload[payload_size] = {0, 0, 0, 0, 0, 0};
 
@@ -43,7 +44,7 @@ while(!Serial);
 #if TEMPSENSOR && DEBUG
   Serial.println("DHT11");
 #endif
-dht.setup(A0);
+dht.setup(10);
   //DHT11 End
 }
 
@@ -58,6 +59,8 @@ void loop() {
 }
 
 void checkInputs(){
+  digitalWrite(inputsCtrl, HIGH);
+  delay(1000);
   int countTime = 0;
   for(int i = 0; i < 4; i++){
        payload[i] = 0; 
@@ -101,11 +104,15 @@ void checkInputs(){
       previousMillisWhileInputs = millis();
     }
   }
+  digitalWrite(inputsCtrl, LOW);
 }
 
 void getDht11Inputs(){
-  delay(dht.getMinimumSamplingPeriod());
-  payload[payload_size-2] = dht.getTemperature();
-  payload[payload_size-1] = dht.getHumidity();
+  do{
+    delay(dht.getMinimumSamplingPeriod());
+    payload[payload_size-2] = dht.getTemperature();
+    payload[payload_size-1] = dht.getHumidity();
+  }while(dht.getStatusString() != "OK");
+  
   
 }

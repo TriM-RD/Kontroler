@@ -104,10 +104,8 @@ void checkInputs(){
 }
 
 void getDht11Inputs(){
-  do{
-    delay(dht.getMinimumSamplingPeriod());
-    payload[payload_size-2] = dht.getTemperature();
-    payload[payload_size-1] = dht.getHumidity();
-  }while(dht.getStatusString() != "OK");
+  delay(dht.getMinimumSamplingPeriod());
+  payload[payload_size-2] = dht.getTemperature();
+  payload[payload_size-1] = dht.getHumidity();
   
 }

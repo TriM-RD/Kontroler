@@ -100,6 +100,7 @@ dht.setup(10);
 }
 
 void loop() {
+  getDht11Inputs();
   //delay(1000);
   if(wakeup_count >= 0)//Change on two places
   {
@@ -107,7 +108,7 @@ void loop() {
     getDht11Inputs();
     //if(statusChanged){
       //lora.wakeUp();
-      if((unsigned long)(millis() - prevMillisLora) >= 9000 || statusChanged) {
+      if((unsigned long)(millis() - prevMillisLora) >= 100000 || statusChanged) {
         prevMillisLora = millis(); 
     
         debugln("Sending: ");
@@ -131,7 +132,9 @@ void loop() {
     wakeup_count = 0;
   }
   wakeup_count++;
+  getDht11Inputs();
   delay(1000);
+  getDht11Inputs();
   //goToSleep();
 }
 
@@ -200,6 +203,7 @@ void checkInputs(){
   digitalWrite(inputsCtrl, HIGH);
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
+  getDht11Inputs();
   while(countTime <= 5){
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
@@ -235,6 +239,7 @@ void checkInputs(){
       }
     }
     if((unsigned long)(millis() - prevMillisInputs) >= 2000){
+      getDht11Inputs();
       countTime++;
       prevMillisInputs = millis();
     }
@@ -246,6 +251,7 @@ void checkInputs(){
       statusChanged = true;
     }
   } 
+  getDht11Inputs();
   if(statusChanged){
     statusChanged = true;
   }else{

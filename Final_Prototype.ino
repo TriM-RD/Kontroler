@@ -10,25 +10,22 @@
  * please buy us a round!
  * Distributed as-is; no warranty is given.
  */
-#define DEBUG 1 // Treba biti 1 da bi radio program -_-
+#define DEBUG 0 // Treba biti 1 da bi radio program -_-
 #if DEBUG
   #define debug(x) Serial.print(x)
   #define debugln(x) Serial.println(x)
-  #define beginSerial() Serial.begin(9600)
+  #define beginSerial() Serial.begin(57600)
 #else
   #define debug(x)
   #define debugln(x)
   #define beginSerial()
 #endif
 #include <lorawan.h>
-#include "DHT.h"
-
-DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0049759"};
+const char devEui[] PROGMEM = {"70B3D57ED0049986"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"682C6C2FC30EA122F8A375D36344EC61"};
+const char appKey[] PROGMEM = {"AB9FDD753A6E7D1ED5B73D613C3F9A51"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
@@ -83,20 +80,21 @@ void setup() {
   pinMode(dataPin, INPUT);
   pinMode(inputsCtrl, OUTPUT);
 #if DEBUG
-  debugln(String("More Inputs"));
+  debugln(F("More Inputs"));
 #endif
   //More Inputs End
 
   //DHT11
 #if TEMPSENSOR && DEBUG
-  debugln("DHT11");
+  debugln(F("DHT11"));
 #endif
-dht.setup(10);
+//dht.setup(10);
   //DHT11 End
   
   //Lora Init
   initLoraWithJoin();
   // Join procedure End
+  
 }
 
 void loop() {
@@ -111,7 +109,7 @@ void loop() {
       if((unsigned long)(millis() - prevMillisLora) >= 100000 || statusChanged) {
         prevMillisLora = millis(); 
     
-        debugln("Sending: ");
+        debugln(F("Sending: "));
         //debugln(myStr);
      
         lora.sendUplink(payload, 6, 0, 1);
@@ -142,7 +140,7 @@ void initLoraWithJoin(){
   //Lora Init
   if(!lora.init()){
     #if DEBUG
-    debugln("RFM95 not detected");
+    debugln(F("RFM95 not detected"));
     #endif
     delay(5000);
     return;
@@ -172,13 +170,13 @@ void initLoraWithJoin(){
   bool isJoined;
   do {
     #if DEBUG
-    debugln("Joining...");
+    debugln(F("Joining..."));
     #endif
     isJoined = lora.join();
     delay(5000);
   }while(!isJoined);
   #if DEBUG
-  debugln("Joined to network");
+  debugln(F("Joined to network"));
   #endif
   // Join procedure End
   digitalWrite(ledCtrl, 0);
@@ -261,6 +259,7 @@ void checkInputs(){
 
 void readSensor()
 {
+  memory_dump();
   // Make sure we don't poll the sensor too often
   // - Max sample rate DHT11 is 1 Hz   (duty cicle 1000 ms)
   // - Max sample rate DHT22 is 0.5 Hz (duty cicle 2000 ms)
@@ -327,6 +326,35 @@ void readSensor()
 
   humDHT = rawHumidity >> 8;
   tempDHT = rawTemperature >> 8;
+}
+
+void memory_dump(){
+  uint16_t address;
+  uint8_t byte_at_address, new_line;
+  address = 0x0100;
+  new_line = 1;
+
+  while(address <= 0x08FF){
+    byte_at_address = *(byte *)address;
+    if(((byte_at_address >> 4) & 0x0F) > 9)UDR0 = 55 + (byte_at_address >> 4 & 0x0F);
+    else UDR0 = 48 + ((byte_at_address >> 4) & 0x0F);
+    while(!(UCSR0A & (1 << UDRE0)));
+
+    if((byte_at_address & 0x0F) > 9)UDR0 = 55 + (byte_at_address & 0x0F);
+    else UDR0 = 48 + (byte_at_address & 0x0F);
+    while(!(UCSR0A & (1 << UDRE0)));
+
+    if(new_line == 64){
+      new_line = 0;
+      UDR0 = 0x0A;
+      while( !(UCSR0A & (1 << UDRE0)));
+      UDR0 = 0x0D;
+      while(!(UCSR0A & (1 << UDRE0)));
+    }
+
+    address++;
+    new_line++;
+  }
 }
 
 ISR(WDT_vect){

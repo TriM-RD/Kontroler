@@ -11,6 +11,7 @@
  * Distributed as-is; no warranty is given.
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
+#define DHT11Pin 10
 #if DEBUG
   #define debug(x) Serial.print(x)
   #define debugln(x) Serial.println(x)
@@ -26,9 +27,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0049759"};
+const char devEui[] PROGMEM = {"70B3D57ED00498B6"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"682C6C2FC30EA122F8A375D36344EC61"};
+const char appKey[] PROGMEM = {"8D09259EA1D639A1E0BC02C1C9A3CFA0"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
@@ -91,7 +92,7 @@ void setup() {
 #if TEMPSENSOR && DEBUG
   debugln("DHT11");
 #endif
-dht.setup(10);
+dht.setup(DHT11Pin);
   //DHT11 End
   
   //Lora Init
@@ -100,7 +101,6 @@ dht.setup(10);
 }
 
 void loop() {
-  getDht11Inputs();
   //delay(1000);
   if(wakeup_count >= 0)//Change on two places
   {
@@ -108,7 +108,7 @@ void loop() {
     getDht11Inputs();
     //if(statusChanged){
       //lora.wakeUp();
-      if((unsigned long)(millis() - prevMillisLora) >= 100000 || statusChanged) {
+      if(/*(unsigned long)(millis() - prevMillisLora) >= 100000 ||*/ statusChanged) {
         prevMillisLora = millis(); 
     
         debugln("Sending: ");
@@ -132,9 +132,7 @@ void loop() {
     wakeup_count = 0;
   }
   wakeup_count++;
-  getDht11Inputs();
   delay(1000);
-  getDht11Inputs();
   //goToSleep();
 }
 
@@ -197,13 +195,13 @@ void getDht11Inputs(){
       payload[4] = tempDHT;
       payload[5] = humDHT;  
     }
+    //debugln(tempDHT);
 }
 
 void checkInputs(){
   digitalWrite(inputsCtrl, HIGH);
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
-  getDht11Inputs();
   while(countTime <= 5){
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
@@ -239,7 +237,6 @@ void checkInputs(){
       }
     }
     if((unsigned long)(millis() - prevMillisInputs) >= 2000){
-      getDht11Inputs();
       countTime++;
       prevMillisInputs = millis();
     }
@@ -251,7 +248,6 @@ void checkInputs(){
       statusChanged = true;
     }
   } 
-  getDht11Inputs();
   if(statusChanged){
     statusChanged = true;
   }else{
@@ -268,12 +264,12 @@ void readSensor()
 
   // Request sample
 
-  digitalWrite(10, LOW); // Send start signal
-  pinMode(10, OUTPUT);
+  digitalWrite(DHT11Pin, LOW); // Send start signal
+  pinMode(DHT11Pin, OUTPUT);
   delay(18);
 
-  pinMode(10, INPUT);
-  digitalWrite(10, HIGH); // Switch bus to receive data
+  pinMode(DHT11Pin, INPUT);
+  digitalWrite(DHT11Pin, HIGH); // Switch bus to receive data
 
   // We're going to read 83 edges:
   // - First a FALLING, RISING, and FALLING edge for the start bit
@@ -295,7 +291,7 @@ void readSensor()
         return;
       }
     }
-    while ( digitalRead(10) == (i & 1) ? HIGH : LOW );
+    while ( digitalRead(DHT11Pin) == (i & 1) ? HIGH : LOW );
 
     if ( i >= 0 && (i & 1) ) {
       // Now we are being fed our 40 bits

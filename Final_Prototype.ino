@@ -11,7 +11,8 @@
  * Distributed as-is; no warranty is given.
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
-#define DHT11Pin 10
+#define DHT11Pin A0
+#define LED 0 // upali/ugasi led indikator
 #if DEBUG
   #define debug(x) Serial.print(x)
   #define debugln(x) Serial.println(x)
@@ -23,20 +24,21 @@
 #endif
 #include <lorawan.h>
 #include "DHT.h"
+#include <Wire.h>
 
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED00498B6"};
+const char devEui[] PROGMEM = {"70B3D57ED004B3C6"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"8D09259EA1D639A1E0BC02C1C9A3CFA0"};
+const char appKey[] PROGMEM = {"61DE62E887073E3FCE5A3F962F99C7CE"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
 bool statusChanged = true;
 uint8_t wakeup_count = 3; //Change on two places
 
-char outStr[255];  
+char outStr[100];  
 byte payload[6] = {0, 0, 0, 0, 0, 0};
 
 byte recvStatus = 0;
@@ -46,8 +48,7 @@ const PROGMEM sRFM_pins RFM_pins = {
   .RST = 5,
   .DIO0 = 2,
   .DIO1 = 3,
-  .DIO2 = 4,
-  .DIO5 = A5,
+  .DIO2 = 4
 };
 
 const int PROGMEM latchPin = 8;
@@ -55,17 +56,18 @@ const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
 
 const int PROGMEM inputsCtrl = A1;
+#if LED
 const int PROGMEM ledCtrl = A4;
-
+#endif
 byte tempDHT = 0;
 byte humDHT = 0;
 
 void setup() {
   beginSerial();
+  
   //Watchdog
   ADCSRA = 0;
-
-  PRR = (1 << PRTWI) |
+  PRR = //(1 << PRTWI) |
         (1 << PRTIM2) |
         (1 << PRTIM1) |
         //(1 << PRSPI) |
@@ -74,9 +76,16 @@ void setup() {
   //Watchdog End
 
   //LED
+  #if LED
   pinMode(ledCtrl, OUTPUT);
   digitalWrite(ledCtrl, 1);
+  #endif
   //LED End
+
+  //I2C 
+  Wire.begin(0);
+  Wire.onReceive(receiveEvent);
+  //I2C End
   
   //More Inputs
   pinMode(latchPin, OUTPUT);
@@ -109,6 +118,7 @@ void loop() {
     //if(statusChanged){
       //lora.wakeUp();
       if(/*(unsigned long)(millis() - prevMillisLora) >= 100000 ||*/ statusChanged) {
+        //getInterfaceData();
         prevMillisLora = millis(); 
     
         debugln("Sending: ");
@@ -133,6 +143,7 @@ void loop() {
   }
   wakeup_count++;
   delay(1000);
+  getInterfaceData();
   //goToSleep();
 }
 
@@ -146,7 +157,7 @@ void initLoraWithJoin(){
     return;
   }
   lora.setDeviceClass(CLASS_A);
-  lora.setTxPower(15,PA_BOOST_PIN);
+  //lora.setTxPower(15,PA_BOOST_PIN);
   lora.setDataRate(SF9BW125);
   lora.setChannel(MULTI);
   char output1[16];
@@ -179,6 +190,7 @@ void initLoraWithJoin(){
   debugln("Joined to network");
   #endif
   // Join procedure End
+  #if LED
   digitalWrite(ledCtrl, 0);
   delay(500);
   digitalWrite(ledCtrl, 1);
@@ -186,6 +198,13 @@ void initLoraWithJoin(){
   digitalWrite(ledCtrl, 0);
   delay(500);
   digitalWrite(ledCtrl, 1);
+  #endif
+}
+
+void getInterfaceData(){
+  Wire.beginTransmission(1);
+  Wire.write("a"); 
+  Wire.endTransmission();
 }
 
 void getDht11Inputs(){
@@ -236,7 +255,7 @@ void checkInputs(){
         tempPayload[i] = myDataIn[i];
       }
     }
-    if((unsigned long)(millis() - prevMillisInputs) >= 2000){
+    if((unsigned long)(millis() - prevMillisInputs) >= 1000){
       countTime++;
       prevMillisInputs = millis();
     }
@@ -353,4 +372,18 @@ void goToSleep() {
   SMCR &= ~(1 << SE);
 
   MCUCR = mcucr_backup;
+}
+
+void receiveEvent(int howMany)
+{
+  int x = Wire.read();       // recibe el último byte como número
+  statusChanged = true;
+  Serial.println("YES SIR");
+  /*while(1 < Wire.available()) // hacemos loop por todos los bytes salvo el último
+  {
+    char c = Wire.read();    // recibe un byte como carácter
+    Serial.print(c);         // imprime el carácter
+  }
+  int x = Wire.read();       // recibe el último byte como número
+  Serial.println(x);         // imprime el número*/
 }

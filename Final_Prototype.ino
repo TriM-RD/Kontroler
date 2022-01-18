@@ -29,9 +29,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED004B3C6"};
+const char devEui[] PROGMEM = {"70B3D57ED004B6C6"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"61DE62E887073E3FCE5A3F962F99C7CE"};
+const char appKey[] PROGMEM = {"1A928AA42DED88203555BD5726C89D99"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
@@ -42,6 +42,8 @@ char outStr[100];
 byte payload[6] = {0, 0, 0, 0, 0, 0};
 
 byte recvStatus = 0;
+
+bool onBattery = true;
 
 const PROGMEM sRFM_pins RFM_pins = {
   .CS = 6,
@@ -110,41 +112,41 @@ dht.setup(DHT11Pin);
 }
 
 void loop() {
-  //delay(1000);
-  if(wakeup_count >= 0)//Change on two places
-  {
-    checkInputs();
-    getDht11Inputs();
-    //if(statusChanged){
-      //lora.wakeUp();
-      if(/*(unsigned long)(millis() - prevMillisLora) >= 100000 ||*/ statusChanged) {
-        //getInterfaceData();
-        prevMillisLora = millis(); 
-    
-        debugln("Sending: ");
-        //debugln(myStr);
-     
-        lora.sendUplink(payload, 6, 0, 1);
-        statusChanged = false;
-      }
-
-      
+  if(onBattery){
+    if(wakeup_count >= 3)//Change on two places
+    {
+      checkInputs();
+      getDht11Inputs();
+      getInterfaceData();
+      lora.wakeUp();  
+      debugln("Sending: ");    
+      lora.sendUplink(payload, 6, 0, 1);
       recvStatus = lora.readData(outStr);
       if(recvStatus) {
         debugln(outStr);
       }
-      
-      // Check Lora RX
       lora.update();
-    //} 
-    
-    //lora.sleep();
-    wakeup_count = 0;
+      lora.sleep();
+      wakeup_count = 0;
+    }
+    wakeup_count++;
+    goToSleep();
+  }else{//On Main Power
+    checkInputs();
+    getDht11Inputs();
+    getInterfaceData();
+    if(statusChanged){
+      debugln("Sending: ");
+      lora.sendUplink(payload, 6, 0, 1);
+      statusChanged = false;
+    }
+
+    recvStatus = lora.readData(outStr);
+    if(recvStatus) {
+      debugln(outStr);
+    }
+    lora.update();
   }
-  wakeup_count++;
-  delay(1000);
-  getInterfaceData();
-  //goToSleep();
 }
 
 void initLoraWithJoin(){

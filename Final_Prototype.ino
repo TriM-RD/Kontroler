@@ -35,7 +35,6 @@ const char appKey[] PROGMEM = {"1A928AA42DED88203555BD5726C89D99"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
-bool statusChanged = true;
 uint8_t wakeup_count = 3; //Change on two places
 
 char outStr[100];  
@@ -44,6 +43,9 @@ byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 byte recvStatus = 0;
 
 bool onBattery = false;
+bool dht11External = true;
+bool externalInterrupt = false;
+bool statusChanged = true;
 
 const PROGMEM sRFM_pins RFM_pins = {
   .CS = 6,
@@ -134,11 +136,14 @@ void loop() {
   }else{//On Main Power
     checkInputs();
     getDht11Inputs();
-    if(statusChanged){
-      getInterfaceData();//FIX
+    if(statusChanged || externalInterrupt){
+      if(!externalInterrupt){
+        getInterfaceData();  
+      }
       debugln("Sending: ");
       lora.sendUplink(payload, 10, 0, 1);
       statusChanged = false;
+      externalInterrupt = false;
     }
 
     recvStatus = lora.readData(outStr);
@@ -205,18 +210,27 @@ void initLoraWithJoin(){
 
 void getInterfaceData(){
   Wire.beginTransmission(1);
-  Wire.write("a"); 
-  Wire.endTransmission();
+  Wire.write(onBattery); 
+  if(Wire.endTransmission() != 0){
+    dht11External = false;
+    payload[6] = 0;
+    payload[7] = 0;
+    payload[8] = 0;
+    payload[9] = 0;
+  }else{
+    dht11External = true;
+  }
 }
 
 void getDht11Inputs(){
+  if(!dht11External){
     readSensor(); 
     if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
       statusChanged = true;
       payload[4] = tempDHT;
       payload[5] = humDHT;  
     }
-    //debugln(tempDHT);
+  }
 }
 
 void checkInputs(){
@@ -380,6 +394,7 @@ void receiveEvent(int howMany)
 {
   int i = 0;
   byte x = 0;
+  dht11External = true;
   debugln("YES SIR");
   while(Wire.available()){
     x = Wire.read();
@@ -394,10 +409,10 @@ void receiveEvent(int howMany)
         payload[8] = x;
       break;
       case 3:
-        //payload[4] = x;FIX
+        payload[4] = x;
       break;
       case 4:
-        //payload[5] = x;FIX
+        payload[5] = x;
       break;
       case 5:
         debugln("CHECK SIR");
@@ -410,7 +425,7 @@ void receiveEvent(int howMany)
     i++;
   }
   if(payload[9] == 0){
-    statusChanged = true;
+    externalInterrupt = true;
     debugln("SEND SIR");
   }
 }

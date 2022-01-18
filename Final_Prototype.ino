@@ -39,11 +39,11 @@ bool statusChanged = true;
 uint8_t wakeup_count = 3; //Change on two places
 
 char outStr[100];  
-byte payload[6] = {0, 0, 0, 0, 0, 0};
+byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 byte recvStatus = 0;
 
-bool onBattery = true;
+bool onBattery = false;
 
 const PROGMEM sRFM_pins RFM_pins = {
   .CS = 6,
@@ -120,7 +120,7 @@ void loop() {
       getInterfaceData();
       lora.wakeUp();  
       debugln("Sending: ");    
-      lora.sendUplink(payload, 6, 0, 1);
+      lora.sendUplink(payload, 10, 0, 1);
       recvStatus = lora.readData(outStr);
       if(recvStatus) {
         debugln(outStr);
@@ -134,10 +134,10 @@ void loop() {
   }else{//On Main Power
     checkInputs();
     getDht11Inputs();
-    getInterfaceData();
     if(statusChanged){
+      getInterfaceData();//FIX
       debugln("Sending: ");
-      lora.sendUplink(payload, 6, 0, 1);
+      lora.sendUplink(payload, 10, 0, 1);
       statusChanged = false;
     }
 
@@ -378,14 +378,39 @@ void goToSleep() {
 
 void receiveEvent(int howMany)
 {
-  int x = Wire.read();       // recibe el último byte como número
-  statusChanged = true;
-  Serial.println("YES SIR");
-  /*while(1 < Wire.available()) // hacemos loop por todos los bytes salvo el último
-  {
-    char c = Wire.read();    // recibe un byte como carácter
-    Serial.print(c);         // imprime el carácter
+  int i = 0;
+  byte x = 0;
+  debugln("YES SIR");
+  while(Wire.available()){
+    x = Wire.read();
+    switch(i){
+      case 0:
+        payload[6] = x;
+      break;
+      case 1:
+        payload[7] = x;
+      break;
+      case 2:
+        payload[8] = x;
+      break;
+      case 3:
+        //payload[4] = x;FIX
+      break;
+      case 4:
+        //payload[5] = x;FIX
+      break;
+      case 5:
+        debugln("CHECK SIR");
+        payload[9] = x;
+      break;
+      default:
+      debugln("Someting went wrong");
+      break;
+    }
+    i++;
   }
-  int x = Wire.read();       // recibe el último byte como número
-  Serial.println(x);         // imprime el número*/
+  if(payload[9] == 0){
+    statusChanged = true;
+    debugln("SEND SIR");
+  }
 }

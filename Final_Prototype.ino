@@ -29,9 +29,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED004B6C6"};
+const char devEui[] PROGMEM = {"70B3D57ED0049BC1"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"1A928AA42DED88203555BD5726C89D99"};
+const char appKey[] PROGMEM = {"77060A80845A12DE33C285991EC63105"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
@@ -39,12 +39,12 @@ uint8_t wakeup_count = 3; //Change on two places
 
 char outStr[100];  
 byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+//master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
 
 byte recvStatus = 0;
 
-bool onBattery = false;
 bool dht11External = true;
-bool externalInterrupt = false;
+//bool externalInterrupt = false;
 bool statusChanged = true;
 
 const PROGMEM sRFM_pins RFM_pins = {
@@ -114,12 +114,14 @@ dht.setup(DHT11Pin);
 }
 
 void loop() {
-  if(onBattery){
+  debug("batteryStatus: ");
+  debugln(payload[9]);
+  if(payload[9]){
     if(wakeup_count >= 3)//Change on two places
     {
       checkInputs();
-      getDht11Inputs();
       getInterfaceData();
+      getDht11Inputs();
       lora.wakeUp();  
       debugln("Sending: ");    
       lora.sendUplink(payload, 10, 0, 1);
@@ -131,19 +133,17 @@ void loop() {
       lora.sleep();
       wakeup_count = 0;
     }
+    getBatteryInfo();
     wakeup_count++;
     goToSleep();
   }else{//On Main Power
     checkInputs();
+    getInterfaceData();
     getDht11Inputs();
-    if(statusChanged || externalInterrupt){
-      if(!externalInterrupt){
-        getInterfaceData();  
-      }
+    if(statusChanged){
       debugln("Sending: ");
       lora.sendUplink(payload, 10, 0, 1);
       statusChanged = false;
-      externalInterrupt = false;
     }
 
     recvStatus = lora.readData(outStr);
@@ -151,6 +151,7 @@ void loop() {
       debugln(outStr);
     }
     lora.update();
+    getBatteryInfo();
   }
 }
 
@@ -208,15 +209,29 @@ void initLoraWithJoin(){
   #endif
 }
 
+void getBatteryInfo(){
+  bool tempStatus = payload[9];
+  Wire.requestFrom(3,1);//Address
+  if(Wire.available())
+  {
+    debug("HERE");
+    payload[9] = Wire.read();
+  }
+  if(payload[9] != tempStatus){
+    statusChanged = true;
+    debugln("Battery changed");
+  }
+  debugln(payload[9]);
+}
+
 void getInterfaceData(){
   Wire.beginTransmission(1);
-  Wire.write(onBattery); 
+  Wire.write(payload[9]); 
   if(Wire.endTransmission() != 0){
     dht11External = false;
     payload[6] = 0;
     payload[7] = 0;
     payload[8] = 0;
-    payload[9] = 0;
   }else{
     dht11External = true;
   }
@@ -225,11 +240,12 @@ void getInterfaceData(){
 void getDht11Inputs(){
   if(!dht11External){
     readSensor(); 
-    if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
-      statusChanged = true;
-      payload[4] = tempDHT;
-      payload[5] = humDHT;  
-    }
+  }
+  if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
+    statusChanged = true;
+    debugln("dht11 changed");
+    payload[4] = tempDHT;
+    payload[5] = humDHT;  
   }
 }
 
@@ -409,14 +425,14 @@ void receiveEvent(int howMany)
         payload[8] = x;
       break;
       case 3:
-        payload[4] = x;
+        tempDHT = x;
       break;
       case 4:
-        payload[5] = x;
+        humDHT = x;
       break;
       case 5:
         debugln("CHECK SIR");
-        payload[9] = x;
+        //payload[9] = x;
       break;
       default:
       debugln("Someting went wrong");
@@ -424,8 +440,8 @@ void receiveEvent(int howMany)
     }
     i++;
   }
-  if(payload[9] == 0){
+  /*if(payload[9] == 0){
     externalInterrupt = true;
     debugln("SEND SIR");
-  }
+  }*/
 }

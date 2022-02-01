@@ -37,7 +37,7 @@ unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
 uint8_t wakeup_count = 3; //Change on two places
 
-char outStr[100];  
+char outStr[255];  
 byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
 
@@ -52,7 +52,8 @@ const PROGMEM sRFM_pins RFM_pins = {
   .RST = 5,
   .DIO0 = 2,
   .DIO1 = 3,
-  .DIO2 = 4
+  .DIO2 = 4,
+  .DIO5 = A2
 };
 
 const int PROGMEM latchPin = 8;
@@ -114,8 +115,8 @@ dht.setup(DHT11Pin);
 }
 
 void loop() {
-  debug("batteryStatus: ");
-  debugln(payload[9]);
+  /*debug("batteryStatus: ");
+  debugln(payload[9]);*/
   if(payload[9]){
     if(wakeup_count >= 3)//Change on two places
     {
@@ -165,7 +166,7 @@ void initLoraWithJoin(){
     return;
   }
   lora.setDeviceClass(CLASS_A);
-  //lora.setTxPower(15,PA_BOOST_PIN);
+  lora.setTxPower(A2,PA_BOOST_PIN);
   lora.setDataRate(SF9BW125);
   lora.setChannel(MULTI);
   char output1[16];
@@ -253,33 +254,30 @@ void checkInputs(){
   digitalWrite(inputsCtrl, HIGH);
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
+  int myDataIn[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  for(int x = 0; x < 1000; x++){
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
-          int i;
-          byte myDataIn[31] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-        
-          pinMode(clockPin, OUTPUT);
-          pinMode(dataPin, INPUT);
-          for(int i = 0; i < 1000; i++){
-            for (i=31; i>=0; i--)
-            {
-              digitalWrite(clockPin, 0);
-              delayMicroseconds(0.2);
-              myDataIn[i] += digitalRead(dataPin);
-              digitalWrite(clockPin, 1);
-            }
-            delay(1);
-          }
-          
-    for(i = 0; i < 31; i++){  
-      if(myDataIn[i] > 200){
-       tempPayload[i/8] = myDataIn[i/8] | (1 << i%8);
-      }else if(myDataIn[i] < 100){
-        tempPayload[i/8] = myDataIn[i/8] | (0 << i%8);
-      }
+    
+    pinMode(clockPin, OUTPUT);
+    pinMode(dataPin, INPUT);     
+    for (int i=31; i>=0; i--)
+    {
+      digitalWrite(clockPin, 0);
+      delayMicroseconds(0.2);
+      myDataIn[i] += digitalRead(dataPin);
+      digitalWrite(clockPin, 1);
     }
+    delay(1);
+  }
+   
+  for(int i=31; i>=0; i--){  
+    if(myDataIn[i] > 200){
+     tempPayload[i/8] = tempPayload[i/8] | (1 << i%8);
+    }
+  }
   digitalWrite(inputsCtrl, LOW);
   for(int i = 0; i < 4; i++){
     if(payload[i] != tempPayload[i]){

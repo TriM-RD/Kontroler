@@ -11,7 +11,7 @@
  * Distributed as-is; no warranty is given.
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
-#define DHT11Pin 10
+#define DHT11Pin A0
 #if DEBUG
   #define debug(x) Serial.print(x)
   #define debugln(x) Serial.println(x)
@@ -27,9 +27,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED00498B6"};
+const char devEui[] PROGMEM = {"70B3D57ED004C062"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"8D09259EA1D639A1E0BC02C1C9A3CFA0"};
+const char appKey[] PROGMEM = {"C4CFD1D738568F2EAD3F13A41E7701E6"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
@@ -47,7 +47,6 @@ const PROGMEM sRFM_pins RFM_pins = {
   .DIO0 = 2,
   .DIO1 = 3,
   .DIO2 = 4,
-  .DIO5 = A5,
 };
 
 const int PROGMEM latchPin = 8;
@@ -55,7 +54,7 @@ const int PROGMEM dataPin = 9;
 const int PROGMEM clockPin = 7;
 
 const int PROGMEM inputsCtrl = A1;
-const int PROGMEM ledCtrl = A4;
+const int PROGMEM ledCtrl = A3;
 
 byte tempDHT = 0;
 byte humDHT = 0;

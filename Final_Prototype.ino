@@ -253,45 +253,33 @@ void checkInputs(){
   digitalWrite(inputsCtrl, HIGH);
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
-  while(countTime <= 5){
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
           int i;
-          int temp = 0;
-          int pinState;
-          byte myDataIn[4] = {0,0,0,0};
-          byte test = 0;
+          byte myDataIn[31] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
         
           pinMode(clockPin, OUTPUT);
           pinMode(dataPin, INPUT);
-        
-          for (i=31; i>=0; i--)
-          {
-            digitalWrite(clockPin, 0);
-            delayMicroseconds(0.2);
-            temp = digitalRead(dataPin);
-            if (temp) {
-              pinState = 1;
-              myDataIn[i/8] = myDataIn[i/8] | (1 << i%8); 
+          for(int i = 0; i < 1000; i++){
+            for (i=31; i>=0; i--)
+            {
+              digitalWrite(clockPin, 0);
+              delayMicroseconds(0.2);
+              myDataIn[i] += digitalRead(dataPin);
+              digitalWrite(clockPin, 1);
             }
-            else {
-              pinState = 0;
-            }
-            digitalWrite(clockPin, 1);
+            delay(1);
           }
           
-    for(i = 0; i < 4; i++){
-       if(myDataIn[i] > tempPayload[i]){
-        tempPayload[i] = myDataIn[i];
+    for(i = 0; i < 31; i++){  
+      if(myDataIn[i] > 200){
+       tempPayload[i/8] = myDataIn[i/8] | (1 << i%8);
+      }else if(myDataIn[i] < 100){
+        tempPayload[i/8] = myDataIn[i/8] | (0 << i%8);
       }
     }
-    if((unsigned long)(millis() - prevMillisInputs) >= 1000){
-      countTime++;
-      prevMillisInputs = millis();
-    }
-  }
   digitalWrite(inputsCtrl, LOW);
   for(int i = 0; i < 4; i++){
     if(payload[i] != tempPayload[i]){

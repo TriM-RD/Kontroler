@@ -29,15 +29,16 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0049BC1"};
+const char devEui[] PROGMEM = {"70B3D57ED004C1D3"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"77060A80845A12DE33C285991EC63105"};
+const char appKey[] PROGMEM = {"91B468F23EBF5C083CD5401CE7B5443F"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
 uint8_t wakeup_count = 3; //Change on two places
-
-char outStr[255];  
+int limit[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int diff[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+char outStr[200];  
 byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
 
@@ -273,8 +274,14 @@ void checkInputs(){
     delay(1);
   }
    
-  for(int i=31; i>=0; i--){  
-    if(myDataIn[i] > 200){
+  for(int i=31; i>=0; i--){
+    if(myDataIn[i] - limit[i] > diff[i]){
+        diff[i] = myDataIn[i] - limit[i];  
+      }
+    if(myDataIn[i] > (limit[i]+(limit[i]*0.10))){
+      limit[i] = myDataIn[i]-diff[i];
+    }
+    if(myDataIn[i] > limit[i] || myDataIn[i] > 950){
      tempPayload[i/8] = tempPayload[i/8] | (1 << i%8);
     }
   }

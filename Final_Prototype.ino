@@ -12,7 +12,7 @@
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
 #define DHT11Pin A0
-#define LED 0 // upali/ugasi led indikator
+#define LED 1 // upali/ugasi led indikator
 #if DEBUG
   #define debug(x) Serial.print(x)
   #define debugln(x) Serial.println(x)
@@ -29,15 +29,13 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED004C1D3"};
+const char devEui[] PROGMEM = {"70B3D57ED0049BC1"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"91B468F23EBF5C083CD5401CE7B5443F"};
+const char appKey[] PROGMEM = {"77060A80845A12DE33C285991EC63105"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
 uint8_t wakeup_count = 3; //Change on two places
-int limit[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int diff[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 char outStr[200];  
 byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
@@ -63,7 +61,7 @@ const int PROGMEM clockPin = 7;
 
 const int PROGMEM inputsCtrl = A1;
 #if LED
-const int PROGMEM ledCtrl = A4;
+const int PROGMEM ledCtrl = A3;
 #endif
 byte tempDHT = 0;
 byte humDHT = 0;
@@ -218,6 +216,8 @@ void getBatteryInfo(){
   {
     debug("HERE");
     payload[9] = Wire.read();
+  }else{
+    payload[9] = 0;
   }
   if(payload[9] != tempStatus){
     statusChanged = true;
@@ -251,8 +251,9 @@ void getDht11Inputs(){
   }
 }
 
-void checkInputs(){
+void checkInputs(){ 
   digitalWrite(inputsCtrl, HIGH);
+  delay(1000);
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
   int myDataIn[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -275,13 +276,7 @@ void checkInputs(){
   }
    
   for(int i=31; i>=0; i--){
-    if(myDataIn[i] - limit[i] > diff[i]){
-        diff[i] = myDataIn[i] - limit[i];  
-      }
-    if(myDataIn[i] > (limit[i]+(limit[i]*0.10))){
-      limit[i] = myDataIn[i]-diff[i];
-    }
-    if(myDataIn[i] > limit[i] || myDataIn[i] > 950){
+    if(myDataIn[i] > 20){
      tempPayload[i/8] = tempPayload[i/8] | (1 << i%8);
     }
   }

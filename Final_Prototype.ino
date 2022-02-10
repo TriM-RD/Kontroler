@@ -214,10 +214,13 @@ void getBatteryInfo(){
   Wire.requestFrom(3,1);//Address
   if(Wire.available())
   {
-    debug("HERE");
-    payload[9] = Wire.read();
+    if(Wire.read() == 0){
+      payload[9] = 1;
+    }else{
+      payload[9] = 0;
+    }
   }else{
-    payload[9] = 0;
+    payload[9] = 1;
   }
   if(payload[9] != tempStatus){
     statusChanged = true;

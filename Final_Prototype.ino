@@ -29,9 +29,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0049BC1"};
+const char devEui[] PROGMEM = {"70B3D57ED004C810"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"77060A80845A12DE33C285991EC63105"};
+const char appKey[] PROGMEM = {"0E1491829D9B47CC9FEA604C808ED102"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
@@ -210,8 +210,18 @@ void initLoraWithJoin(){
 }
 
 void getBatteryInfo(){
-  bool tempStatus = payload[9];
-  Wire.requestFrom(3,1);//Address
+  Wire.beginTransmission(2);
+  Wire.write(payload[9]); 
+  if(Wire.endTransmission() != 0){
+    dht11External = false;
+    payload[6] = 0;
+    payload[7] = 0;
+    payload[8] = 0;
+  }else{
+    dht11External = true;
+  }
+  /*bool tempStatus = payload[9];
+  Wire.requestFrom(2,1);//Address
   if(Wire.available())
   {
     if(Wire.read() == 0){
@@ -226,7 +236,7 @@ void getBatteryInfo(){
     statusChanged = true;
     debugln("Battery changed");
   }
-  debugln(payload[9]);
+  debugln(payload[9]);*/
 }
 
 void getInterfaceData(){
@@ -399,6 +409,8 @@ void goToSleep() {
 
 void receiveEvent(int howMany)
 {
+  bool isInterface = false; //if false then it is an UPS
+  debugln("Working");
   int i = 0;
   byte x = 0;
   dht11External = true;
@@ -407,21 +419,26 @@ void receiveEvent(int howMany)
     x = Wire.read();
     switch(i){
       case 0:
-        payload[6] = x;
+        if(x == 1){
+          isInterface = true;
+        }
       break;
       case 1:
-        payload[7] = x;
+        payload[6] = x;
       break;
       case 2:
-        payload[8] = x;
+        payload[7] = x;
       break;
       case 3:
-        tempDHT = x;
+        payload[8] = x;
       break;
       case 4:
-        humDHT = x;
+        tempDHT = x;  
       break;
       case 5:
+        humDHT = x;
+      break;
+      case 6:
         debugln("CHECK SIR");
         //payload[9] = x;
       break;

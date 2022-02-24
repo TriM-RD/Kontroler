@@ -211,7 +211,7 @@ void initLoraWithJoin(){
 
 void getBatteryInfo(){
   bool tempStatus = payload[9];
-  Wire.requestFrom(3,1);//Address
+  Wire.requestFrom(2,1);//Address
   if(Wire.available())
   {
     if(Wire.read() == 0){

@@ -1,14 +1,8 @@
 /**
- * Example of OTAA device      
+ * Kontroler code      
  * Authors: 
- *        Ivan Moreno
- *        Eduardo Contreras
- *  June 2019
- * 
- * This code is beerware; if you see me (or any other collaborator 
- * member) at the local, and you've found our code helpful, 
- * please buy us a round!
- * Distributed as-is; no warranty is given.
+ *        Joso Marich
+ *  March 2022
  */
 #define DEBUG 1 // Treba biti 1 da bi radio program -_-
 #define DHT11Pin A0
@@ -29,9 +23,9 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"70B3D57ED0049BC1"};
-const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"77060A80845A12DE33C285991EC63105"};
+const char devEui[] PROGMEM = {""};
+const char appEui[] PROGMEM = {""};
+const char appKey[] PROGMEM = {""};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;

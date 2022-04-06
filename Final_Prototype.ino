@@ -19,6 +19,7 @@
 #include <lorawan.h>
 #include "DHT.h"
 #include <Wire.h>
+#include <I2CAddress.h>
 
 DHT dht;
 
@@ -82,7 +83,7 @@ void setup() {
   //LED End
 
   //I2C 
-  Wire.begin(0);
+  Wire.begin(I2CAddress::Controller);
   Wire.onReceive(receiveEvent);
   //I2C End
   
@@ -111,7 +112,8 @@ dht.setup(DHT11Pin);
 void loop() {
   if(manualMode == true){
     checkInputs();
-    Wire.beginTransmission(9);
+    Wire.beginTransmission(I2CAddress::Debugger);
+    Wire.write(I2CAddress::Controller);
     Wire.write(payload[3]);
     Wire.endTransmission();
     delay(2000);
@@ -232,7 +234,8 @@ void getBatteryInfo(){
 }
 
 void getInterfaceData(){
-  Wire.beginTransmission(1);
+  Wire.beginTransmission(I2CAddress::Interface);
+  Wire.write(I2CAddress::Controller);
   Wire.write(payload[9]); 
   if(Wire.endTransmission() != 0){
     dht11External = false;
@@ -401,56 +404,63 @@ void goToSleep() {
 
 void receiveEvent(int howMany)
 {
-  int i = 0;
-  byte x = 0;
-  dht11External = true;
-  bool manual = true;
   debugln("YES SIR");
-  if(!manualMode){
-      while(Wire.available()){
-      x = Wire.read();
-      switch(i){
-        case 0:
-          if(x!=1){manual = false;}
-          payload[6] = x;
-        break;
-        case 1:
-          if(x!=0){manual = false;}
-          payload[7] = x;
-        break;
-        case 2:
-          if(x!=1){manual = false;}
-          payload[8] = x;
-        break;
-        case 3:
-          if(x!=0){manual = false;}
-          tempDHT = x;
-        break;
-        case 4:
-          if(x!=1){manual = false;}
-          humDHT = x;
-        break;
-        case 5:
-          if(x!=0){manual = false;}
-          debugln("CHECK SIR");
-          //payload[9] = x;
-        break;
+  if(Wire.available()){
+      switch(Wire.read()){
+        case I2CAddress::Interface:
+          receiveFromInterface();
+          break;
+        case I2CAddress::Ups:
+          break;
+        case I2CAddress::Debugger:
+          manualMode = !manualMode;
+          break;
         default:
-        debugln("Someting went wrong");
-        break;
-      }
-      i++;
-    }
-    manualMode = manual;
-  }else{
-    if(Wire.available()){
-      Wire.read();
-      manualMode = false;
-    }
+          debugln("Someting went wrong");
+          break; 
+      }   
   }
   
   /*if(payload[9] == 0){
     externalInterrupt = true;
     debugln("SEND SIR");
   }*/
+}
+
+void receiveFromInterface(){
+  dht11External = true;
+  int i = 1;
+  byte x = 0;
+  while(Wire.available()){
+    x = Wire.read();
+    switch(i){
+          case 1:
+            payload[6] = x;
+          break;
+          case 2:
+            payload[7] = x;
+          break;
+          case 3:
+            payload[8] = x;
+          break;
+          case 4:
+            tempDHT = x;
+          break;
+          case 5:
+            humDHT = x;
+          break;
+          case 6:
+            debugln("CHECK SIR");
+            //payload[9] = x;
+          break;
+          default:
+          debugln("Someting went wrong");
+          break;
+        }
+        i++;
+  }
+}
+
+void receiveFromUPS(){
+  
 }

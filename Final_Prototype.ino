@@ -34,6 +34,7 @@ char outStr[200];
 byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
 
+bool manualMode = false;
 byte recvStatus = 0;
 
 bool dht11External = true;
@@ -108,9 +109,14 @@ dht.setup(DHT11Pin);
 }
 
 void loop() {
-  /*debug("batteryStatus: ");
-  debugln(payload[9]);*/
-  if(payload[9]){
+  if(manualMode == true){
+    checkInputs();
+    Wire.beginTransmission(9);
+    Wire.write(payload[3]);
+    Wire.endTransmission();
+    delay(2000);
+  }else{
+    if(payload[9]){
     if(wakeup_count >= 3)//Change on two places
     {
       checkInputs();
@@ -147,6 +153,8 @@ void loop() {
     lora.update();
     getBatteryInfo();
   }
+  }
+  
 }
 
 void initLoraWithJoin(){
@@ -273,7 +281,7 @@ void checkInputs(){
   }
    
   for(int i=31; i>=0; i--){
-    if(myDataIn[i] > 20){
+    if(myDataIn[i] > 50){
      tempPayload[i/8] = tempPayload[i/8] | (1 << i%8);
     }
   }
@@ -396,35 +404,51 @@ void receiveEvent(int howMany)
   int i = 0;
   byte x = 0;
   dht11External = true;
+  bool manual = true;
   debugln("YES SIR");
-  while(Wire.available()){
-    x = Wire.read();
-    switch(i){
-      case 0:
-        payload[6] = x;
-      break;
-      case 1:
-        payload[7] = x;
-      break;
-      case 2:
-        payload[8] = x;
-      break;
-      case 3:
-        tempDHT = x;
-      break;
-      case 4:
-        humDHT = x;
-      break;
-      case 5:
-        debugln("CHECK SIR");
-        //payload[9] = x;
-      break;
-      default:
-      debugln("Someting went wrong");
-      break;
+  if(!manualMode){
+      while(Wire.available()){
+      x = Wire.read();
+      switch(i){
+        case 0:
+          if(x!=1){manual = false;}
+          payload[6] = x;
+        break;
+        case 1:
+          if(x!=0){manual = false;}
+          payload[7] = x;
+        break;
+        case 2:
+          if(x!=1){manual = false;}
+          payload[8] = x;
+        break;
+        case 3:
+          if(x!=0){manual = false;}
+          tempDHT = x;
+        break;
+        case 4:
+          if(x!=1){manual = false;}
+          humDHT = x;
+        break;
+        case 5:
+          if(x!=0){manual = false;}
+          debugln("CHECK SIR");
+          //payload[9] = x;
+        break;
+        default:
+        debugln("Someting went wrong");
+        break;
+      }
+      i++;
     }
-    i++;
+    manualMode = manual;
+  }else{
+    if(Wire.available()){
+      Wire.read();
+      manualMode = false;
+    }
   }
+  
   /*if(payload[9] == 0){
     externalInterrupt = true;
     debugln("SEND SIR");

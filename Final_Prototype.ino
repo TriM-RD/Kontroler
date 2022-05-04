@@ -20,6 +20,7 @@
 #include "DHT.h"
 #include <Wire.h>
 #include <I2CAddress.h>
+//#include "LowPower.h"
 
 DHT dht;
 
@@ -47,17 +48,16 @@ const PROGMEM sRFM_pins RFM_pins = {
   .RST = 5,
   .DIO0 = 2,
   .DIO1 = 3,
-  .DIO2 = 4,
-  .DIO5 = A2
+  .DIO2 = 4
 };
 
-const int PROGMEM latchPin = 8;
-const int PROGMEM dataPin = 9;
-const int PROGMEM clockPin = 7;
+const PROGMEM byte latchPin = 8;
+const PROGMEM byte dataPin = 9;
+const PROGMEM byte clockPin = 7;
 
-const int PROGMEM inputsCtrl = A1;
+const PROGMEM byte inputsCtrl = A1;
 #if LED
-const int PROGMEM ledCtrl = A3;
+const PROGMEM byte ledCtrl = A3;
 #endif
 byte tempDHT = 0;
 byte humDHT = 0;
@@ -138,6 +138,7 @@ void loop() {
     getBatteryInfo();
     wakeup_count++;
     goToSleep();
+    //LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF); 
   }else{//On Main Power
     checkInputs();
     getInterfaceData();
@@ -169,8 +170,8 @@ void initLoraWithJoin(){
     return;
   }
   lora.setDeviceClass(CLASS_A);
-  lora.setTxPower(A2,PA_BOOST_PIN);
-  lora.setDataRate(SF9BW125);
+  //lora.setTxPower(A2,PA_BOOST_PIN);
+  lora.setDataRate(SF12BW125);
   lora.setChannel(MULTI);
   char output1[16];
   for (byte k = 0; k < 16; k++) {
@@ -261,7 +262,13 @@ void getDht11Inputs(){
 
 void checkInputs(){ 
   digitalWrite(inputsCtrl, HIGH);
-  delay(1000);
+  if(payload[9]){
+    digitalWrite(ledCtrl, 1);
+    delay(250);
+    digitalWrite(ledCtrl, 0);
+  }else{
+    delay(100);
+  }
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
   int myDataIn[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -271,8 +278,8 @@ void checkInputs(){
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
     
-    pinMode(clockPin, OUTPUT);
-    pinMode(dataPin, INPUT);     
+    //pinMode(clockPin, OUTPUT);
+    //pinMode(dataPin, INPUT);     
     for (int i=31; i>=0; i--)
     {
       digitalWrite(clockPin, 0);
@@ -282,12 +289,13 @@ void checkInputs(){
     }
     delay(1);
   }
-   
   for(int i=31; i>=0; i--){
     if(myDataIn[i] > 50){
      tempPayload[i/8] = tempPayload[i/8] | (1 << i%8);
     }
   }
+  digitalWrite(latchPin, LOW);
+  digitalWrite(clockPin, LOW);
   digitalWrite(inputsCtrl, LOW);
   for(int i = 0; i < 4; i++){
     if(payload[i] != tempPayload[i]){

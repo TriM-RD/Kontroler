@@ -20,35 +20,38 @@
 #include "DHT.h"
 #include <Wire.h>
 #include <I2CAddress.h>
-//#include "LowPower.h"
 
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {""};
-const char appEui[] PROGMEM = {""};
-const char appKey[] PROGMEM = {""};
+const char devEui[] PROGMEM = {"1231231231231231"};
+const char appEui[] PROGMEM = {"0000000000000000"};
+const char appKey[] PROGMEM = {"ABC4FB03893E47434EC0D3F64741021E"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
 uint8_t wakeup_count = 3; //Change on two places
-char outStr[200];  
+char outStr[255];  
 byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
 
 bool manualMode = false;
 byte recvStatus = 0;
+byte detectThreshold = 50;
 
 bool dht11External = true;
 //bool externalInterrupt = false;
 bool statusChanged = true;
+const byte PROGMEM SF9 = 0;
+const byte PROGMEM SF12 = 1;
 
 const PROGMEM sRFM_pins RFM_pins = {
   .CS = 6,
   .RST = 5,
   .DIO0 = 2,
   .DIO1 = 3,
-  .DIO2 = 4
+  .DIO2 = 4,
+  .DIO5 = 16
 };
 
 const PROGMEM byte latchPin = 8;
@@ -93,13 +96,13 @@ void setup() {
   pinMode(dataPin, INPUT);
   pinMode(inputsCtrl, OUTPUT);
 #if DEBUG
-  debugln(String("More Inputs"));
+  //debugln(String("More Inputs"));
 #endif
   //More Inputs End
 
   //DHT11
 #if TEMPSENSOR && DEBUG
-  debugln("DHT11");
+  //debugln("DHT11");
 #endif
 dht.setup(DHT11Pin);
   //DHT11 End
@@ -118,7 +121,7 @@ void loop() {
     Wire.endTransmission();
     delay(2000);
   }else{
-    if(payload[9]){
+    if(payload[9]){//On Battery
     if(wakeup_count >= 3)//Change on two places
     {
       checkInputs();
@@ -137,9 +140,13 @@ void loop() {
     }
     getBatteryInfo();
     wakeup_count++;
-    goToSleep();
-    //LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF); 
+    if(manualMode == false && payload[9] == true){
+      goToSleep();
+    }else{
+      lora.wakeUp();    
+    } 
   }else{//On Main Power
+    wakeup_count = 99;
     checkInputs();
     getInterfaceData();
     getDht11Inputs();
@@ -148,7 +155,6 @@ void loop() {
       lora.sendUplink(payload, 10, 0, 1);
       statusChanged = false;
     }
-
     recvStatus = lora.readData(outStr);
     if(recvStatus) {
       debugln(outStr);
@@ -170,8 +176,8 @@ void initLoraWithJoin(){
     return;
   }
   lora.setDeviceClass(CLASS_A);
-  //lora.setTxPower(A2,PA_BOOST_PIN);
-  lora.setDataRate(SF12BW125);
+  lora.setTxPower(16,PA_BOOST_PIN);
+  lora.setDataRate(SF9BW125);
   lora.setChannel(MULTI);
   char output1[16];
   for (byte k = 0; k < 16; k++) {
@@ -194,47 +200,47 @@ void initLoraWithJoin(){
   bool isJoined;
   do {
     #if DEBUG
-    debugln("Joining...");
+    //debugln("Joining...");
     #endif
     isJoined = lora.join();
     delay(5000);
   }while(!isJoined);
   #if DEBUG
-  debugln("Joined to network");
+  //debugln("Joined to network");
   #endif
   // Join procedure End
-  #if LED
-  digitalWrite(ledCtrl, 0);
-  delay(500);
-  digitalWrite(ledCtrl, 1);
-  delay(500);
-  digitalWrite(ledCtrl, 0);
-  delay(500);
-  digitalWrite(ledCtrl, 1);
-  #endif
+  ledNotif(0);
+  //lora.setDataRate(SF9BW125);
 }
 
 void getBatteryInfo(){
   bool tempStatus = payload[9];
-  Wire.requestFrom(2,1);//Address
-  if(Wire.available())
-  {
-    if(Wire.read() == 0){
-      payload[9] = 1;
-    }else{
-      payload[9] = 0;
-    }
-  }else{
+  Wire.beginTransmission(I2CAddress::Ups);
+  Wire.write(I2CAddress::Controller);
+  if(Wire.endTransmission() != 0){
     payload[9] = 1;
+  }else{
+    payload[9] = 0;
   }
   if(payload[9] != tempStatus){
     statusChanged = true;
     debugln("Battery changed");
   }
   debugln(payload[9]);
+  if(payload[9]){
+    digitalWrite(ledCtrl, 0);
+  }else{
+    digitalWrite(ledCtrl, 1);
+  }
+        
 }
 
 void getInterfaceData(){
+  pinMode(A5, OUTPUT);
+  delay(50);
+  pinMode(A5, INPUT);
+  Wire.begin(I2CAddress::Controller);
+  Wire.onReceive(receiveEvent);
   Wire.beginTransmission(I2CAddress::Interface);
   Wire.write(I2CAddress::Controller);
   Wire.write(payload[9]); 
@@ -254,7 +260,7 @@ void getDht11Inputs(){
   }
   if((payload[4] - tempDHT >= 3 || payload[4] - tempDHT <= -3 || payload[5] - humDHT >= 5 || payload[5] - humDHT <= -5) && humDHT != 0){
     statusChanged = true;
-    debugln("dht11 changed");
+    //debugln("dht11 changed");
     payload[4] = tempDHT;
     payload[5] = humDHT;  
   }
@@ -263,11 +269,9 @@ void getDht11Inputs(){
 void checkInputs(){ 
   digitalWrite(inputsCtrl, HIGH);
   if(payload[9]){
-    digitalWrite(ledCtrl, 1);
-    delay(250);
-    digitalWrite(ledCtrl, 0);
+    ledNotif(1);
   }else{
-    delay(100);
+    delay(1000);  
   }
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
@@ -278,8 +282,8 @@ void checkInputs(){
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
     
-    //pinMode(clockPin, OUTPUT);
-    //pinMode(dataPin, INPUT);     
+    pinMode(clockPin, OUTPUT);
+    pinMode(dataPin, INPUT);     
     for (int i=31; i>=0; i--)
     {
       digitalWrite(clockPin, 0);
@@ -290,7 +294,7 @@ void checkInputs(){
     delay(1);
   }
   for(int i=31; i>=0; i--){
-    if(myDataIn[i] > 50){
+    if(myDataIn[i] > detectThreshold){
      tempPayload[i/8] = tempPayload[i/8] | (1 << i%8);
     }
   }
@@ -419,12 +423,14 @@ void receiveEvent(int howMany)
           receiveFromInterface();
           break;
         case I2CAddress::Ups:
+          payload[9] = 0;
           break;
         case I2CAddress::Debugger:
-          manualMode = !manualMode;
+          receiveFromDebugger();
           break;
         default:
-          debugln("Someting went wrong");
+          //debugln("Someting went wrong");
+          ledNotif(-1);
           break; 
       }   
   }
@@ -458,17 +464,113 @@ void receiveFromInterface(){
             humDHT = x;
           break;
           case 6:
-            debugln("CHECK SIR");
+            //debugln("CHECK SIR");
             //payload[9] = x;
           break;
           default:
-          debugln("Someting went wrong");
+            //debugln("Someting went wrong");
+            ledNotif(-1);
           break;
         }
         i++;
   }
 }
 
-void receiveFromUPS(){
-  
+void receiveFromDebugger(){
+  int i = 1;
+  byte x = 0;
+  while(Wire.available()){
+    x = Wire.read();
+    switch(i){
+      case 1:
+        manualMode = x;
+        break;
+      case 2:
+        setDataRate(x);
+        break;
+      case 3:
+        detectThreshold = x;
+        break;
+      default:
+        ledNotif(-1);
+        break;
+    }
+    i++;
+  }
+}
+
+
+void setDataRate (byte dataRate) {
+  switch(dataRate){
+    case SF9:
+      lora.setDataRate(SF9BW125);
+      break;
+    case SF12:
+      lora.setDataRate(SF12BW125);
+      break;
+    default:
+      ledNotif(-1);
+      break;
+  }
+}
+
+void ledNotif(byte event){
+  #if LED
+  switch(event){
+    case 0://Lora Connected
+      digitalWrite(ledCtrl, 0);
+      delay(500);
+      digitalWrite(ledCtrl, 1);
+      delay(500);
+      digitalWrite(ledCtrl, 0);
+      delay(500);
+      digitalWrite(ledCtrl, 1);
+      break;
+    case 1://On Battery
+      digitalWrite(ledCtrl, 1);
+      delay(250);
+      digitalWrite(ledCtrl, 0);
+      break;
+    default://Error (SOS)
+      digitalWrite(ledCtrl, 1);
+      delay(500);
+      digitalWrite(ledCtrl, 0); 
+      delay(300);
+      digitalWrite(ledCtrl, 1);
+      delay(500);
+      digitalWrite(ledCtrl, 0); 
+      delay(300);
+      digitalWrite(ledCtrl, 1);
+      delay(500);
+      digitalWrite(ledCtrl, 0); 
+      delay(300);
+      //
+      digitalWrite(ledCtrl, 1);
+      delay(1500);
+      digitalWrite(ledCtrl, 0); 
+      delay(300);
+      digitalWrite(ledCtrl, 1);
+      delay(1500);
+      digitalWrite(ledCtrl, 0); 
+      delay(300);
+      digitalWrite(ledCtrl, 1);
+      delay(1500);
+      digitalWrite(ledCtrl, 0); 
+      delay(300);
+      //
+      digitalWrite(ledCtrl, 1);
+      delay(500);
+      digitalWrite(ledCtrl, 0); 
+      delay(300);
+      digitalWrite(ledCtrl, 1);
+      delay(500);
+      digitalWrite(ledCtrl, 0); 
+      delay(300);
+      digitalWrite(ledCtrl, 1);
+      delay(500);
+      digitalWrite(ledCtrl, 0); 
+      delay(3000);
+      break;
+  }
+  #endif
 }

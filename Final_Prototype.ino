@@ -24,15 +24,15 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"1231231231231231"};
+const char devEui[] PROGMEM = {"1341231231351432"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"ABC4FB03893E47434EC0D3F64741021E"};
+const char appKey[] PROGMEM = {"D522E34F32B6C5E12FE6ECCC5089F815"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
 uint8_t wakeup_count = 3; //Change on two places
-char outStr[255];  
-byte payload[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+char outStr[200];  
+byte payload[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
 
 bool manualMode = false;
@@ -44,6 +44,8 @@ bool dht11External = true;
 bool statusChanged = true;
 const byte PROGMEM SF9 = 0;
 const byte PROGMEM SF12 = 1;
+byte countOffline = 0;
+byte looped = 2;
 
 const PROGMEM sRFM_pins RFM_pins = {
   .CS = 6,
@@ -87,6 +89,7 @@ void setup() {
 
   //I2C 
   Wire.begin(I2CAddress::Controller);
+  Wire.setWireTimeout(3000, true);
   Wire.onReceive(receiveEvent);
   //I2C End
   
@@ -129,7 +132,7 @@ void loop() {
       getDht11Inputs();
       lora.wakeUp();  
       debugln("Sending: ");    
-      lora.sendUplink(payload, 10, 0, 1);
+      lora.sendUplink(payload, 11, 0, 1);
       recvStatus = lora.readData(outStr);
       if(recvStatus) {
         debugln(outStr);
@@ -146,22 +149,29 @@ void loop() {
       lora.wakeUp();    
     } 
   }else{//On Main Power
-    wakeup_count = 99;
-    checkInputs();
-    getInterfaceData();
-    getDht11Inputs();
-    if(statusChanged){
-      debugln("Sending: ");
-      lora.sendUplink(payload, 10, 0, 1);
-      statusChanged = false;
+      wakeup_count = 99;
+      checkInputs();
+      getInterfaceData();
+      getDht11Inputs();
+      if(statusChanged && looped >= 2){
+        debugln("Sending: ");
+        lora.sendUplink(payload, 11, 0, 1);
+        statusChanged = false;
+        looped = 0;
+      }
+      recvStatus = lora.readData(outStr);
+      if(recvStatus) {
+        debugln(outStr);
+      }
+      lora.update();
+      getBatteryInfo();
+      if(looped > 3){
+        looped = 2;
+      }else{
+        looped++;
+      }
+      
     }
-    recvStatus = lora.readData(outStr);
-    if(recvStatus) {
-      debugln(outStr);
-    }
-    lora.update();
-    getBatteryInfo();
-  }
   }
   
 }
@@ -218,9 +228,14 @@ void getBatteryInfo(){
   Wire.beginTransmission(I2CAddress::Ups);
   Wire.write(I2CAddress::Controller);
   if(Wire.endTransmission() != 0){
-    payload[9] = 1;
+    countOffline++;
   }else{
+    countOffline = 0;
     payload[9] = 0;
+  }
+  Wire.clearWireTimeoutFlag();
+  if(countOffline > 3){
+    payload[9] = 1;
   }
   if(payload[9] != tempStatus){
     statusChanged = true;
@@ -240,6 +255,7 @@ void getInterfaceData(){
   delay(50);
   pinMode(A5, INPUT);
   Wire.begin(I2CAddress::Controller);
+  Wire.setWireTimeout(3000, true);
   Wire.onReceive(receiveEvent);
   Wire.beginTransmission(I2CAddress::Interface);
   Wire.write(I2CAddress::Controller);
@@ -249,9 +265,14 @@ void getInterfaceData(){
     payload[6] = 0;
     payload[7] = 0;
     payload[8] = 0;
+    if(payload[10] != 0){statusChanged = true;}
+    payload[10] = 0;
   }else{
     dht11External = true;
+    if(payload[10] != 1){statusChanged = true;}
+    payload[10] = 1;
   }
+  Wire.clearWireTimeoutFlag();
 }
 
 void getDht11Inputs(){
@@ -304,7 +325,13 @@ void checkInputs(){
   for(int i = 0; i < 4; i++){
     if(payload[i] != tempPayload[i]){
       payload[i] = tempPayload[i];
-      statusChanged = true;
+      if(i != 3){
+        if(payload[i] != 255 && payload[i] != 0){
+          statusChanged = true;
+        }
+      }else{
+        statusChanged = true;
+      } 
     }
   } 
   if(statusChanged){
@@ -449,12 +476,15 @@ void receiveFromInterface(){
     x = Wire.read();
     switch(i){
           case 1:
+            if(payload[6] != x){statusChanged = true;}
             payload[6] = x;
           break;
           case 2:
+            if(payload[7] != x){statusChanged = true;}
             payload[7] = x;
           break;
           case 3:
+            if(payload[8] != x){statusChanged = true;}
             payload[8] = x;
           break;
           case 4:

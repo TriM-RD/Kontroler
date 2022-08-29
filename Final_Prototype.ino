@@ -130,35 +130,23 @@ void loop() {
       checkInputs();
       getInterfaceData();
       getDht11Inputs();
-      if(looped < 1){
-        lora.wakeUp();  
-      }else
-      if(looped >= 1){
-        lora.sendUplink(payload, 11, 0, 1);
-        recvStatus = lora.readData(outStr);
-        if(recvStatus) {
-          debugln(outStr);
-        }
-        lora.update();
-        lora.sleep();
-        wakeup_count = 0;
-        looped = 0;
+      lora.wakeUp();
+      lora.sendUplink(payload, 11, 0, 1);
+      recvStatus = lora.readData(outStr);
+      if(recvStatus) {
+        debugln(outStr);
       }
+      lora.update();
+      lora.sleep();
+      wakeup_count = 0;
     }
     getBatteryInfo();
     wakeup_count++;
-    if(looped >= 1){
-      if(manualMode == false && payload[9] == true){
+    if(manualMode == false && payload[9] == true){
       goToSleep();
-      }else{
-        lora.wakeUp();    
-      } 
-    }
-    if(looped > 2){
-        looped = 1;
-      }else{
-        looped++;
-      }
+    }else{
+      lora.wakeUp();    
+    } 
     
   }else{//On Main Power
       wakeup_count = 99;
@@ -220,26 +208,12 @@ void initLoraWithJoin(){
 
   // Join procedure
   bool isJoined = false;
-  //bool changeDataRate = false;
-  //byte tryDataRate = 0;
   do {
-    /*if(tryDataRate > 1){
-      tryDataRate = 0;
-      if(changeDataRate){
-        changeDataRate = false;
-        lora.setDataRate(SF9BW125);
-      }else{
-        changeDataRate = true;
-        lora.setDataRate(SF12BW125);
-      }
-    }
-    delay(2500);*/
     #if DEBUG
     //debugln("Joining...");
     #endif
     isJoined = lora.join();
     delay(5000);
-    //tryDataRate++;
   }while(!isJoined);
   #if DEBUG
   //debugln("Joined to network");

@@ -4,7 +4,7 @@
  *        Joso Marich
  *  March 2022
  */
-#define DEBUG 1 // Treba biti 1 da bi radio program -_-
+#define DEBUG 0 // Treba biti 1 da bi radio program -_-
 #define DHT11Pin A0
 #define LED 1 // upali/ugasi led indikator
 #if DEBUG
@@ -24,14 +24,14 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"1341231231351432"};
+const char devEui[] PROGMEM = {"D15D0C1E49954482"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"D522E34F32B6C5E12FE6ECCC5089F815"};
+const char appKey[] PROGMEM = {"8A824734B0A0CFA93555EDEEE96A7DF8"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
 uint8_t wakeup_count = 3; //Change on two places
-char outStr[200];  
+char outStr[255];  
 byte payload[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
 
@@ -130,24 +130,36 @@ void loop() {
       checkInputs();
       getInterfaceData();
       getDht11Inputs();
-      lora.wakeUp();  
-      debugln("Sending: ");    
-      lora.sendUplink(payload, 11, 0, 1);
-      recvStatus = lora.readData(outStr);
-      if(recvStatus) {
-        debugln(outStr);
+      if(looped < 1){
+        lora.wakeUp();  
+      }else
+      if(looped >= 1){
+        lora.sendUplink(payload, 11, 0, 1);
+        recvStatus = lora.readData(outStr);
+        if(recvStatus) {
+          debugln(outStr);
+        }
+        lora.update();
+        lora.sleep();
+        wakeup_count = 0;
+        looped = 0;
       }
-      lora.update();
-      lora.sleep();
-      wakeup_count = 0;
     }
     getBatteryInfo();
     wakeup_count++;
-    if(manualMode == false && payload[9] == true){
+    if(looped >= 1){
+      if(manualMode == false && payload[9] == true){
       goToSleep();
-    }else{
-      lora.wakeUp();    
-    } 
+      }else{
+        lora.wakeUp();    
+      } 
+    }
+    if(looped > 2){
+        looped = 1;
+      }else{
+        looped++;
+      }
+    
   }else{//On Main Power
       wakeup_count = 99;
       checkInputs();
@@ -207,13 +219,27 @@ void initLoraWithJoin(){
   //Lora Init End
 
   // Join procedure
-  bool isJoined;
+  bool isJoined = false;
+  //bool changeDataRate = false;
+  //byte tryDataRate = 0;
   do {
+    /*if(tryDataRate > 1){
+      tryDataRate = 0;
+      if(changeDataRate){
+        changeDataRate = false;
+        lora.setDataRate(SF9BW125);
+      }else{
+        changeDataRate = true;
+        lora.setDataRate(SF12BW125);
+      }
+    }
+    delay(2500);*/
     #if DEBUG
     //debugln("Joining...");
     #endif
     isJoined = lora.join();
     delay(5000);
+    //tryDataRate++;
   }while(!isJoined);
   #if DEBUG
   //debugln("Joined to network");

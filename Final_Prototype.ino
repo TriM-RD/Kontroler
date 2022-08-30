@@ -4,7 +4,7 @@
  *        Joso Marich
  *  March 2022
  */
-#define DEBUG 0 // Treba biti 1 da bi radio program -_-
+#define DEBUG 0 
 #define DHT11Pin A0
 #define LED 1 // upali/ugasi led indikator
 #if DEBUG
@@ -24,13 +24,13 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"D15D0C1E49954482"};
+const char devEui[] PROGMEM = {"1341231231351432"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"8A824734B0A0CFA93555EDEEE96A7DF8"};
+const char appKey[] PROGMEM = {"D522E34F32B6C5E12FE6ECCC5089F815"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
-uint8_t wakeup_count = 3; //Change on two places
+uint8_t wakeup_count = 6; //Change on two places
 char outStr[255];  
 byte payload[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
@@ -52,8 +52,8 @@ const PROGMEM sRFM_pins RFM_pins = {
   .RST = 5,
   .DIO0 = 2,
   .DIO1 = 3,
-  .DIO2 = 4,
-  .DIO5 = 16
+  .DIO2 = 4
+  //.DIO5 = 16
 };
 
 const PROGMEM byte latchPin = 8;
@@ -125,28 +125,38 @@ void loop() {
     delay(2000);
   }else{
     if(payload[9]){//On Battery
-    if(wakeup_count >= 3)//Change on two places
+    if(wakeup_count >= 6)//Change on two places
     {
       checkInputs();
       getInterfaceData();
       getDht11Inputs();
-      lora.wakeUp();
-      lora.sendUplink(payload, 11, 0, 1);
-      recvStatus = lora.readData(outStr);
-      if(recvStatus) {
-        debugln(outStr);
-      }
-      lora.update();
-      lora.sleep();
-      wakeup_count = 0;
+      if(looped < 1){
+        lora.wakeUp();
+      }else if(looped > 1){
+        lora.sendUplink(payload, 11, 0, 1);
+        recvStatus = lora.readData(outStr);
+        if(recvStatus) {
+          debugln(outStr);
+        }
+        lora.update();
+        lora.sleep();
+        wakeup_count = 0;
+        looped = 0;
+      }      
     }
     getBatteryInfo();
     wakeup_count++;
-    if(manualMode == false && payload[9] == true){
-      goToSleep();
+    
+    if(looped > 1){
+      looped = 1;
+      if(manualMode == false && payload[9] == true){
+        goToSleep();
+      }else{
+        lora.wakeUp();    
+      } 
     }else{
-      lora.wakeUp();    
-    } 
+      looped++;
+    }
     
   }else{//On Main Power
       wakeup_count = 99;
@@ -186,8 +196,8 @@ void initLoraWithJoin(){
     return;
   }
   lora.setDeviceClass(CLASS_A);
-  lora.setTxPower(16,PA_BOOST_PIN);
-  lora.setDataRate(SF9BW125);
+  //lora.setTxPower(16,PA_BOOST_PIN);
+  lora.setDataRate(SF12BW125);
   lora.setChannel(MULTI);
   char output1[16];
   for (byte k = 0; k < 16; k++) {
@@ -208,12 +218,23 @@ void initLoraWithJoin(){
 
   // Join procedure
   bool isJoined = false;
+  bool changeDataRate = false;
+  byte tryDataRate = 0;
   do {
-    #if DEBUG
-    //debugln("Joining...");
-    #endif
+    debugln("Joining...");
+    if(tryDataRate > 1){
+      if(changeDataRate){
+        changeDataRate = false;
+        lora.setDataRate(SF9BW125);
+      }else{
+        changeDataRate = true;
+        lora.setDataRate(SF12BW125);
+      }  
+    }
+    delay(2500);
     isJoined = lora.join();
-    delay(5000);
+    delay(2500);
+    tryDataRate++;
   }while(!isJoined);
   #if DEBUG
   //debugln("Joined to network");

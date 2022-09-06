@@ -20,17 +20,19 @@
 #include "DHT.h"
 #include <Wire.h>
 #include <I2CAddress.h>
+#include <SystemStatus.h>
 
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"1341231231351432"};
+const char devEui[] PROGMEM = {"216EDDD6209FE0FF"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"D522E34F32B6C5E12FE6ECCC5089F815"};
+const char appKey[] PROGMEM = {"81635A42FC1B5CD153C72FE7457ED0FE"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
-uint8_t wakeup_count = 6; //Change on two places
+const uint8_t wakeUpCountConst = 30;
+uint8_t wakeup_count = wakeUpCountConst; 
 char outStr[255];  
 byte payload[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 //master|slave|slave|slave|temperature|humidity|heater|ventilator|vlaga|batteryStatus
@@ -46,6 +48,8 @@ const byte PROGMEM SF9 = 0;
 const byte PROGMEM SF12 = 1;
 byte countOffline = 0;
 byte looped = 2;
+
+
 
 const PROGMEM sRFM_pins RFM_pins = {
   .CS = 6,
@@ -125,14 +129,12 @@ void loop() {
     delay(2000);
   }else{
     if(payload[9]){//On Battery
-    if(wakeup_count >= 6)//Change on two places
-    {
-      checkInputs();
-      getInterfaceData();
-      getDht11Inputs();
-      if(looped < 1){
-        lora.wakeUp();
-      }else if(looped > 1){
+      if(wakeup_count == wakeUpCountConst){
+          checkInputs();
+          getInterfaceData();
+          getDht11Inputs();
+          lora.wakeUp();
+      }else if(wakeup_count == wakeUpCountConst + 2){
         lora.sendUplink(payload, 11, 0, 1);
         recvStatus = lora.readData(outStr);
         if(recvStatus) {
@@ -141,22 +143,17 @@ void loop() {
         lora.update();
         lora.sleep();
         wakeup_count = 0;
-        looped = 0;
-      }      
-    }
-    getBatteryInfo();
-    wakeup_count++;
-    
-    if(looped > 1){
-      looped = 1;
-      if(manualMode == false && payload[9] == true){
-        goToSleep();
-      }else{
-        lora.wakeUp();    
-      } 
-    }else{
-      looped++;
-    }
+      }    
+      getBatteryInfo();
+      wakeup_count++;
+      
+      if(wakeup_count < wakeUpCountConst){
+        if(manualMode == false && payload[9] == true){
+          goToSleep();
+        }else{
+          lora.wakeUp();    
+        } 
+      }
     
   }else{//On Main Power
       wakeup_count = 99;
@@ -312,8 +309,6 @@ void checkInputs(){
   digitalWrite(inputsCtrl, HIGH);
   if(payload[9]){
     ledNotif(1);
-  }else{
-    delay(1000);  
   }
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
@@ -340,6 +335,7 @@ void checkInputs(){
      tempPayload[i/8] = tempPayload[i/8] | (1 << i%8);
     }
   }
+  delay(500);
   digitalWrite(latchPin, LOW);
   digitalWrite(clockPin, LOW);
   digitalWrite(inputsCtrl, LOW);

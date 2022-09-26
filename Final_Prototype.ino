@@ -25,13 +25,13 @@
 DHT dht;
 
 // OTAA credentials
-const char devEui[] PROGMEM = {"216EDDD6209FE0FF"};
+const char devEui[] PROGMEM = {"4E0C04FA4C12B7C3"};
 const char appEui[] PROGMEM = {"0000000000000000"};
-const char appKey[] PROGMEM = {"81635A42FC1B5CD153C72FE7457ED0FE"};
+const char appKey[] PROGMEM = {"552A242FCA876B931C02FD62C8C94B4B"};
 
 unsigned long prevMillisLora;
 unsigned long prevMillisInputs;
-const uint8_t wakeUpCountConst = 30;
+const uint8_t wakeUpCountConst = 3;
 uint8_t wakeup_count = wakeUpCountConst; 
 char outStr[255];  
 byte payload[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -39,7 +39,10 @@ byte payload[11] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 bool manualMode = false;
 byte recvStatus = 0;
-byte detectThreshold = 50;
+const byte detectThresholdBattery = 50;
+const byte detectThresholdMain = 50;
+byte detectThreshold = detectThresholdMain;
+
 
 bool dht11External = true;
 //bool externalInterrupt = false;
@@ -48,7 +51,7 @@ const byte PROGMEM SF9 = 0;
 const byte PROGMEM SF12 = 1;
 byte countOffline = 0;
 byte looped = 2;
-
+bool firstTime = true;
 
 
 const PROGMEM sRFM_pins RFM_pins = {
@@ -102,6 +105,7 @@ void setup() {
   pinMode(clockPin, OUTPUT);
   pinMode(dataPin, INPUT);
   pinMode(inputsCtrl, OUTPUT);
+  digitalWrite(inputsCtrl, LOW);
 #if DEBUG
   //debugln(String("More Inputs"));
 #endif
@@ -157,9 +161,13 @@ void loop() {
     
   }else{//On Main Power
       wakeup_count = 99;
-      checkInputs();
-      getInterfaceData();
-      getDht11Inputs();
+      if(!firstTime){
+        checkInputs();
+        getInterfaceData();
+        getDht11Inputs();
+      }else{
+        firstTime = false;
+      }
       if(statusChanged && looped >= 2){
         debugln("Sending: ");
         lora.sendUplink(payload, 11, 0, 1);
@@ -186,9 +194,7 @@ void loop() {
 void initLoraWithJoin(){
   //Lora Init
   if(!lora.init()){
-    #if DEBUG
     debugln("RFM95 not detected");
-    #endif
     delay(5000);
     return;
   }
@@ -232,6 +238,7 @@ void initLoraWithJoin(){
     isJoined = lora.join();
     delay(2500);
     tryDataRate++;
+    delay(5000);
   }while(!isJoined);
   #if DEBUG
   //debugln("Joined to network");
@@ -306,21 +313,26 @@ void getDht11Inputs(){
 }
 
 void checkInputs(){ 
-  digitalWrite(inputsCtrl, HIGH);
   if(payload[9]){
     ledNotif(1);
+    detectThreshold = detectThresholdBattery;
+  }else{
+    detectThreshold = detectThresholdMain;
   }
   int countTime = 0;
   byte tempPayload[4] = {0,0,0,0};
   int myDataIn[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-  for(int x = 0; x < 1000; x++){
+  digitalWrite(inputsCtrl, HIGH);
+  for(int x = 0; x < 100; x++){
+    
     digitalWrite(latchPin,1);
     digitalWrite(clockPin, HIGH);
     delayMicroseconds(20);
     digitalWrite(latchPin,0);
     
     pinMode(clockPin, OUTPUT);
-    pinMode(dataPin, INPUT);     
+    pinMode(dataPin, INPUT);  
+       
     for (int i=31; i>=0; i--)
     {
       digitalWrite(clockPin, 0);
@@ -328,7 +340,8 @@ void checkInputs(){
       myDataIn[i] += digitalRead(dataPin);
       digitalWrite(clockPin, 1);
     }
-    delay(1);
+    digitalWrite(inputsCtrl, LOW);
+    delay(20);
   }
   for(int i=31; i>=0; i--){
     if(myDataIn[i] > detectThreshold){
